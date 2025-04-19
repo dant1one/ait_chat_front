@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIT Chat</title>
+  <link rel="stylesheet" href="css/chat.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kufam:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo">AITC</div>
+        <div class="sidebar-actions">
+            <button class="icon-button" aria-label="Users" id="users-button">
+                <img src="assets/svg/users.svg" alt="Users" class="icon-svg">
+            </button>
+            <button class="icon-button" aria-label="Settings">
+                 <img src="assets/svg/settings.svg" alt="Settings" class="icon-svg">
+            </button>
+        </div>
+      </div>
+
+      <!-- Add Contact Popup (Initially Hidden) -->
+      <div id="add-contact-popup" class="add-contact-popup">
+          <button class="close-popup-button" id="close-add-contact-popup" aria-label="Close">&times;</button>
+          <h4>Add New Contact</h4>
+          <div class="add-contact-form">
+              <input type="text" id="add-contact-username" placeholder="Enter username">
+              <button id="add-contact-button">Add</button>
+          </div>
+          <div id="add-contact-status" class="add-contact-status"></div>
+      </div>
+      
+      <div class="search-bar">
+        <input type="search" id="search-input" placeholder="Search messages, people">
+        <button class="icon-button" aria-label="Search">
+             <img src="assets/svg/search.svg" alt="Search" class="icon-svg">
+        </button>
+      </div>
+      <div class="contact-list-container">
+        <div class="pinned-chats">
+          <h2 class="list-header">
+            <img src="assets/svg/pinned.svg" alt="Pinned" class="header-icon-svg">
+            <span>PINNED CHATS</span>
+          </h2>
+          <ul id="pinned-list">
+          </ul>
+        </div>
+        <div class="all-messages">
+          <h2 class="list-header">
+             <img src="assets/svg/chats.svg" alt="Messages" class="header-icon-svg">
+             <span>ALL MESSAGES</span>
+          </h2>
+          <ul id="user-list">
+          </ul>
+        </div>
+      </div>
+      
+      <!-- Add New Chat Button -->
+      <button id="new-chat-button" class="new-chat-button" aria-label="Start New Chat">
+          <img src="assets/svg/plu-icon.svg" alt="New Chat" class="icon-svg">
+          <!-- Or use text like "+" -->
+      </button>
+
+      <!-- New Chat Modal (Initially Hidden) -->
+      <div id="new-chat-modal" class="new-chat-modal">
+          <button class="close-popup-button" id="close-new-chat-modal" aria-label="Close">&times;</button>
+          <h4>Start New Chat</h4>
+          <!-- Optional Search for contacts within modal -->
+          <!-- <input type="search" id="new-chat-search" placeholder="Search contacts..."> -->
+          <ul id="new-chat-contact-list" class="new-chat-contact-list">
+              <!-- Contacts will be populated here by JS -->
+          </ul>
+      </div>
+
+    </aside>
+
+    <!-- Main Chat Area -->
+    <!-- Add chat-disabled class initially -->
+    <main class="chat-area chat-disabled">
+      <!-- Add Placeholder -->
+      <!-- <div class="chat-placeholder"> -->
+        <!-- <h2>Select a chat to start messaging</h2> -->
+        <!-- Optional: Add an icon or illustration here -->
+      <!-- </div> -->
+
+      <header class="chat-header">
+        <div class="contact-details">
+          <div class="avatar-container">
+            <img src="assets/images/default-avatar.png" alt="Avatar" class="avatar" id="chat-header-avatar">
+            <div class="status-indicator offline" id="chat-header-status-indicator"></div>
+          </div>
+          <div class="contact-info">
+            <span class="contact-name" id="chat-header-name">Select a chat</span>
+            <span class="contact-status" id="chat-header-status">Offline</span>
+          </div>
+        </div>
+        <div class="chat-actions">
+            <button class="icon-button" aria-label="Video Call">📹</button>
+            <button class="icon-button" aria-label="Phone Call">📞</button>
+            <button class="icon-button" aria-label="More Options">⋮</button>
+            <button class="logout-button">Logout</button>
+        </div>
+      </header>
+
+      <div id="chat-messages" class="chat-messages">
+      </div>
+
+      <div id="typing-indicator" class="typing-indicator" style="display: none;">
+        <span></span> is typing...
+      </div>
+
+      <footer class="chat-footer">
+        <button class="icon-button" aria-label="Emoji">😊</button>
+        <input id="message-input" type="text" placeholder="Type message...">
+        <button id="send-button" class="send-button">
+            <span>Send</span>
+            <img src="assets/svg/send.svg" alt="Send" class="icon-svg send-icon">
+        </button>
+      </footer>
+    </main>
+  </div>
+  <script src="js/chat.js"></script>
+</body>
+</html> 
