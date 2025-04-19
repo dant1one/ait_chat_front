@@ -823,4 +823,253 @@ body {
 .new-chat-contact-list .contact-item .contact-preview,
 .new-chat-contact-list .contact-item .contact-meta {
     display: none; /* Hide preview and meta in this list */
+}
+
+/* --- Create Group Popup Styles --- */
+.create-group-popup {
+  display: none; /* Hidden by default */
+  /* Re-use styles from add-contact-popup or define new ones */
+  position: absolute;
+  top: 60px;
+  left: 20px;
+  right: 20px;
+  background-color: #f8f9fa;
+  border: 1px solid var(--color-border-medium);
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+}
+
+.create-group-popup.visible {
+  display: block;
+}
+
+.create-group-popup h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.create-group-popup .close-popup-button {
+  /* Inherited styles */
+}
+
+.create-group-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.create-group-form input[type="text"],
+.create-group-form textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-search);
+  border-radius: 5px;
+  font-size: 14px;
+  font-family: var(--font-primary);
+}
+
+.create-group-form textarea {
+    resize: vertical;
+}
+
+.create-group-form button {
+  padding: 10px 15px;
+  background-color: var(--color-text-logo);
+  color: var(--color-text-light);
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.create-group-form button:hover {
+  background-color: #008bdb;
+}
+
+.create-group-form button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.create-group-status {
+  font-size: 13px;
+  min-height: 1.5em;
+  /* Add success/error classes like add-contact-status */
+}
+.create-group-status.success {
+    color: #28a745;
+}
+.create-group-status.error {
+    color: #E53935;
+}
+
+/* --- Group List Section Styles --- */
+.group-list {
+    /* Similar to .all-messages or customize */
+}
+
+#group-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Use .contact-item for groups too, or create .group-item */
+.group-item {
+    /* Copy styles from .contact-item if desired */
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--color-border-light);
+    transition: background-color 0.2s ease;
+}
+
+.group-item:hover {
+  background-color: #f0f0f0;
+}
+
+.group-item.active {
+  background-color: var(--color-bg-contact-active);
+  border-right: 3px solid var(--color-text-logo); 
+}
+
+/* Style group avatar/icon differently if needed */
+.group-item .avatar-container .avatar {
+    /* Maybe use a default group icon */
+    background-color: #e0e0e0; /* Different default bg */
+}
+
+/* --- Manage Members Modal Styles --- */
+.manage-members-modal {
+    display: none; /* Hidden by default */
+    position: absolute; /* Position within the chat area or centered */
+    top: 65px; /* Below header */
+    right: 25px;
+    width: 300px; /* Adjust width */
+    background-color: var(--color-bg-sidebar);
+    border: 1px solid var(--color-border-medium);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+    z-index: 110; /* Above chat content */
+}
+
+.manage-members-modal.visible {
+    display: block;
+}
+
+.manage-members-modal h4, 
+.manage-members-modal h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.manage-members-modal h4 { font-size: 16px; text-align: center; margin-bottom: 15px; }
+.manage-members-modal h5 { font-size: 14px; margin-top: 15px; }
+
+.manage-members-modal .close-popup-button {
+    /* Inherited */
+}
+
+.add-member-section {
+    display: flex;
+    flex-wrap: wrap; /* Allow button to wrap */
+    gap: 8px;
+    align-items: center; /* Align items vertically */
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--color-border-light);
+    padding-bottom: 15px;
+}
+
+.add-member-section h5 {
+    width: 100%; /* Take full width */
+    margin-bottom: 5px; /* Space below header */
+}
+
+#add-member-username {
+    flex-grow: 1; /* Take available space */
+    padding: 6px 8px;
+    border: 1px solid var(--color-border-search);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+#add-member-button {
+    padding: 6px 12px;
+    background-color: var(--color-text-logo);
+    color: var(--color-text-light);
+    border: none;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+#add-member-status {
+    width: 100%; /* Full width for status message */
+    font-size: 12px;
+    min-height: 1.2em;
+    /* Add success/error styles */
+}
+#add-member-status.success { color: #28a745; }
+#add-member-status.error { color: #E53935; }
+
+.group-member-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 200px; /* Limit height */
+    overflow-y: auto;
+}
+
+.group-member-list li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 14px;
+    border-bottom: 1px solid var(--color-border-light);
+}
+
+.group-member-list li:last-child {
+    border-bottom: none;
+}
+
+.group-member-list span { /* Username */
+    flex-grow: 1;
+    margin-right: 10px;
+}
+
+.remove-member-button {
+    background: none;
+    border: none;
+    color: #E53935; /* Red color for removal */
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 2px 5px;
+}
+
+/* Adjustments for header icon buttons if needed */
+.sidebar-actions .icon-button img.icon-svg {
+    width: 20px; /* Consistent icon sizing */
+    height: 20px;
+}
+
+/* Style group items similarly to contact items */
+#group-list .group-item {
+    /* Reuse contact-item styles */
+}
+#group-list .group-item .avatar {
+    /* Style group avatar if different */
+    border-radius: 8px; /* Square-ish for groups? */
 } 

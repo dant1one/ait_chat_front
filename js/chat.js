@@ -20,12 +20,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const newChatModal = document.getElementById('new-chat-modal');
   const closeNewChatModalButton = document.getElementById('close-new-chat-modal');
   const newChatContactList = document.getElementById('new-chat-contact-list');
-  // --- End New elements ---
+  // --- Group Elements ---
+  const groupListElement = document.getElementById('group-list');
+  const createGroupButton = document.getElementById('create-group-button');
+  const createGroupPopup = document.getElementById('create-group-popup');
+  const closeCreateGroupPopup = document.getElementById('close-create-group-popup');
+  const createGroupNameInput = document.getElementById('create-group-name');
+  const createGroupDescInput = document.getElementById('create-group-description');
+  const createGroupSubmitButton = document.getElementById('create-group-submit-button');
+  const createGroupStatus = document.getElementById('create-group-status');
+  const manageGroupMembersButton = document.getElementById('manage-group-members-button');
+  const manageMembersModal = document.getElementById('manage-members-modal');
+  const closeManageMembersModal = document.getElementById('close-manage-members-modal');
+  const groupMemberList = document.getElementById('group-member-list');
+  const addMemberUsernameInput = document.getElementById('add-member-username');
+  const addMemberButton = document.getElementById('add-member-button');
+  const addMemberStatus = document.getElementById('add-member-status');
+  // --- End Group Elements ---
 
   let websocket = null;
   let currentUser = null; // Store current user info
-  let currentChatTarget = null; // Store ID of the user being chatted with (null for broadcast)
+  let currentChatTarget = null; // Store ID of the user OR group being chatted with
+  let currentChatIsGroup = false; // Flag to indicate if target is a group
   let allUsers = {}; // Store fetched user data keyed by ID, including status
+  let allGroups = {}; // Groups cache
   let typingTimeout = null; // For debouncing typing events
 
   const accessToken = localStorage.getItem('accessToken');
@@ -112,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Add click listener to select user and close modal
       listItem.addEventListener('click', () => {
         console.log(`Starting chat with ${user.username} from modal.`);
-        selectUser(user.id);
+        selectChat(user.id, false);
         toggleNewChatModal(false); // Close modal after selection
       });
 
@@ -211,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentUser = await response.json();
         console.log('Current user:', currentUser);
         await fetchContacts(); // Changed from fetchAllUsers
+        await fetchGroups();   // Then fetch groups
       } else {
          console.error('Failed to fetch user data:', response.status);
          // Handle error, maybe redirect to login
@@ -269,14 +288,16 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         `;
 
-        listItem.addEventListener('click', () => selectUser(user.id));
+        listItem.addEventListener('click', () => selectChat(user.id, false));
         userListElement.appendChild(listItem);
     });
   }
 
   // --- Update Unread Count Badge --- (New Helper)
-  function updateUnreadBadge(userId, increment = true) {
-    const listItem = userListElement.querySelector(`[data-user-id="${userId}"]`);
+  function updateUnreadBadge(targetId, isGroup, increment = true) {
+    const listElement = isGroup ? groupListElement : userListElement;
+    const dataAttr = isGroup ? 'data-group-id' : 'data-user-id';
+    const listItem = listElement.querySelector(`[${dataAttr}="${targetId}"]`);
     if (!listItem) return;
     const badge = listItem.querySelector('.unread-count');
     if (!badge) return;
@@ -293,8 +314,9 @@ document.addEventListener('DOMContentLoaded', () => {
     badge.style.display = currentCount > 0 ? 'inline-block' : 'none';
     
     // Also update the count in our local allUsers cache if needed
-    if(allUsers[userId]) {
-        allUsers[userId].unread_count = currentCount;
+    const cache = isGroup ? allGroups : allUsers;
+    if(cache[targetId]) {
+        cache[targetId].unread_count = currentCount;
     }
   }
 
@@ -325,97 +347,126 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Update header if this user is currently selected
     if (currentChatTarget === userId) {
-        updateChatHeaderStatus(isOnline, lastSeenIso);
+        updateChatHeaderStatus(isOnline, lastSeenIso, false);
     }
   }
 
   // --- Fetch Conversation History ---
-  async function fetchConversationHistory(targetUserId) {
+  async function fetchConversationHistory(targetId, isGroup) {
     if (!accessToken || !currentUser) return;
-    console.log(`Fetching history for user ${targetUserId}`);
+    console.log(`Fetching history for ${isGroup ? 'group' : 'user'} ${targetId}`);
     chatMessages.innerHTML = ''; // Clear previous messages
-    appendSystemMessage('Loading history...'); // Show loading indicator
+    appendSystemMessage('Loading history...');
+
+    const endpoint = isGroup
+        ? `http://127.0.0.1:8000/groups/${targetId}` // Gets details including messages
+        : `http://127.0.0.1:8000/conversations/${targetId}`;
 
     try {
-        const response = await fetch(`http://127.0.0.1:8000/conversations/${targetUserId}`, {
+        const response = await fetch(endpoint, {
             method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${accessToken}`
-            }
+            headers: { 'Authorization': `Bearer ${accessToken}` }
         });
 
         if (response.ok) {
-            const history = await response.json();
+            const result = await response.json();
+            const history = isGroup ? result.messages : result; // Extract messages if group details
             console.log('Received history:', history);
             chatMessages.innerHTML = ''; // Clear 'Loading...'
-            if (history.length === 0) {
+            if (!history || history.length === 0) {
                 appendSystemMessage('No messages yet.');
             }
             history.forEach(msg => {
-                const isMe = msg.sender_id === currentUser.id;
-                const senderUsername = isMe ? currentUser.username : (allUsers[msg.sender_id]?.username || 'Unknown User');
-                // Pass read_at status AND message ID to appendMessage
-                appendMessage(senderUsername, msg.content, isMe, msg.timestamp, msg.read_at, msg.id, msg.recipient_id); 
+                const senderIsCurrentUser = msg.sender_id === currentUser.id;
+                // For group messages, sender name needs lookup if not current user
+                let senderUsername = 'Unknown User';
+                if (senderIsCurrentUser) {
+                    senderUsername = currentUser.username;
+                } else if (isGroup) {
+                    // Need group member list or sender info attached to message by backend
+                    // Assuming backend adds sender info {id, username} to group message payload
+                    senderUsername = msg.sender ? msg.sender.username : (allUsers[msg.sender_id]?.username || `User ${msg.sender_id}`);
+                } else {
+                    senderUsername = allUsers[msg.sender_id]?.username || `User ${msg.sender_id}`;
+                }
+
+                appendMessage(senderUsername, msg.content, senderIsCurrentUser, msg.timestamp, msg.read_at, msg.id, msg.recipient_id, isGroup, msg.group_id);
             });
-            // Scroll to the bottom after loading history
             chatMessages.scrollTop = chatMessages.scrollHeight;
         } else {
-            console.error('Failed to fetch conversation history:', response.status, response.statusText);
-            chatMessages.innerHTML = ''; // Clear 'Loading...'
+            console.error('Failed to fetch history:', response.status);
+            chatMessages.innerHTML = '';
             appendSystemMessage('Failed to load message history.');
         }
     } catch (error) {
-        console.error('Error fetching conversation history:', error);
-        chatMessages.innerHTML = ''; // Clear 'Loading...'
+        console.error('Error fetching history:', error);
+        chatMessages.innerHTML = '';
         appendSystemMessage('Error loading message history.');
     }
   }
 
-  // --- Select User for Chat --- // Updated
-  function selectUser(userId) {
-    const user = allUsers[userId];
-    if (!user || userId === currentChatTarget) return;
+  // --- Select Chat (User or Group) - Updated Header Info ---
+  async function selectChat(targetId, isGroup) { // Made async
+    const cache = isGroup ? allGroups : allUsers;
+    const target = cache[targetId];
+    if (!target || (targetId === currentChatTarget && isGroup === currentChatIsGroup)) return;
 
-    console.log(`Selecting user ${userId}`); // Log selection
+    console.log(`Selecting ${isGroup ? 'group' : 'user'} ${targetId}`);
+    currentChatTarget = targetId;
+    currentChatIsGroup = isGroup;
 
-    console.log('Selected user:', user);
-    currentChatTarget = user.id;
-
-    chatHeaderName.textContent = user.username;
-    updateChatHeaderStatus(user.is_online, user.last_seen);
+    // Update Header
+    if (isGroup) {
+        chatHeaderName.textContent = target.group_name;
+        // Fetch details to get member count (async)
+        const details = await fetchGroupDetails(targetId);
+        const memberCount = details?.members?.length ?? 0;
+        chatHeaderStatus.textContent = target.description || `${memberCount} member${memberCount !== 1 ? 's' : ''}`;
+        updateChatHeaderStatus(false, null, true); // Special state for group header
+        manageGroupMembersButton.style.display = 'inline-block'; // Show manage button
+    } else {
+        chatHeaderName.textContent = target.username;
+        updateChatHeaderStatus(target.is_online, target.last_seen, false);
+        manageGroupMembersButton.style.display = 'none'; // Hide manage button
+    }
 
     hideTypingIndicator();
 
-    document.querySelectorAll('.contact-item').forEach(item => item.classList.remove('active'));
-    userListElement.querySelector(`[data-user-id="${userId}"]`)?.classList.add('active');
+    // Update active item in sidebar
+    document.querySelectorAll('.contact-item, .group-item').forEach(item => item.classList.remove('active'));
+    const listElement = isGroup ? groupListElement : userListElement;
+    const dataAttr = isGroup ? 'data-group-id' : 'data-user-id';
+    listElement.querySelector(`[${dataAttr}="${targetId}"]`)?.classList.add('active');
 
-    // Enable the chat area
-    if (chatArea) {
-        chatArea.classList.remove('chat-disabled');
+    // Enable chat area
+    if (chatArea) chatArea.classList.remove('chat-disabled');
+
+    // Clear unread count
+    updateUnreadBadge(targetId, isGroup, false);
+
+    // Send mark_read ONLY for direct messages
+    if (!isGroup) {
+        console.log(`Sending mark_read for sender ${targetId}`);
+        sendWebSocketMessage('mark_read', { sender_id: targetId });
     }
 
-    // Clear the unread count badge for this user
-    updateUnreadBadge(userId, false);
-
-    // Send 'mark_read' event to backend
-    console.log(`Sending mark_read for sender ${userId}`); // Log mark_read send
-    sendWebSocketMessage('mark_read', { sender_id: userId });
-
-    // Fetch history FIRST
-    fetchConversationHistory(userId).then(() => {
-        console.log(`History fetched for ${userId}, attempting icon update.`); // Log history fetch complete
-        // THEN, after history is potentially loaded and displayed,
-        // update any visible sent messages for this newly selected user to read.
-        updateReadStatusIcons(userId); // Update icons for messages this user potentially read
-    });
+    // Fetch history (awaiting fetchConversationHistory to be async if needed)
+    await fetchConversationHistory(targetId, isGroup);
+    if (!isGroup) {
+        // Update read icons only for direct messages after history loads
+         updateReadStatusIcons(targetId);
+    }
   }
 
-  // --- Update Chat Header Status ---
-  function updateChatHeaderStatus(isOnline, lastSeenIso) {
+  // --- Update Chat Header Status (Modified for Groups) ---
+  function updateChatHeaderStatus(isOnline, lastSeenIso, isGroupView = false) {
       const headerStatusIndicator = document.getElementById('chat-header-status-indicator');
       const headerStatusText = document.getElementById('chat-header-status');
 
-      if (isOnline) {
+      if (isGroupView) {
+          headerStatusIndicator.className = 'status-indicator group'; // Add a specific class for group styling?
+          // Text is set in selectChat
+      } else if (isOnline) {
           headerStatusIndicator.className = 'status-indicator online';
           headerStatusText.textContent = 'Online';
       } else {
@@ -424,10 +475,27 @@ document.addEventListener('DOMContentLoaded', () => {
       }
   }
 
-  // --- Show/Hide Typing Indicator ---
-  function showTypingIndicator(username) {
-      if (typingIndicator) {
-          typingIndicator.querySelector('span').textContent = username;
+  // --- Show/Hide Typing Indicator (Updated for Groups) ---
+  let groupTypingUsers = {}; // { groupId: { userId: username, timeoutId }, ... }
+
+  function updateGroupTypingIndicator() {
+      if (!currentChatIsGroup || !typingIndicator) return;
+
+      const typingUsersInCurrentGroup = groupTypingUsers[currentChatTarget] || {};
+      const userNames = Object.values(typingUsersInCurrentGroup).map(u => u.username);
+
+      if (userNames.length === 0) {
+          hideTypingIndicator();
+      } else {
+          let text = '';
+          if (userNames.length === 1) {
+              text = `${userNames[0]} is typing...`;
+          } else if (userNames.length === 2) {
+              text = `${userNames[0]} and ${userNames[1]} are typing...`;
+          } else {
+              text = `${userNames[0]}, ${userNames[1]} and others are typing...`;
+          }
+          typingIndicator.querySelector('span').textContent = text; // Target the span correctly if needed
           typingIndicator.style.display = 'block';
       }
   }
@@ -446,108 +514,110 @@ document.addEventListener('DOMContentLoaded', () => {
     websocket.onopen = (event) => {
       console.log('WebSocket connection opened', event);
       fetchCurrentUser();
-      appendSystemMessage('Connected to chat.');
+       appendSystemMessage('Connected to chat.');
     };
 
     websocket.onmessage = async (event) => {
-      console.log('[WS Received]', event.data); // Log all incoming WS messages
+      console.log('[WS Received]', event.data);
       try {
         const message = JSON.parse(event.data);
         const action = message.action;
         const payload = message.payload;
 
         if (action === 'message') {
-          if (!payload) {
-            console.error('Error: Received message action without payload:', message);
-            return;
-          }
-
+          // --- Direct Message Handling --- (Existing)
           const msg = payload;
           const senderIsCurrentUser = currentUser && msg.sender_id === currentUser.id;
-          // Always hide typing indicator for this user when a message arrives
-          if (!senderIsCurrentUser && msg.sender_id === currentChatTarget) {
-              hideTypingIndicator();
-          }
-          // Logic to display message (check if relevant to current view)
-          if (msg.recipient_id === null || // Broadcast
-             (currentUser && msg.recipient_id === currentUser.id && msg.sender_id === currentChatTarget) || // Direct msg from selected user
-             (senderIsCurrentUser && msg.recipient_id === currentChatTarget) // My direct msg to selected user
-          ) {
-            appendMessage(msg.sender, msg.content, senderIsCurrentUser, msg.timestamp, msg.read_at, msg.id, msg.recipient_id);
-            
-            // If message is from the currently selected chat partner, mark it read immediately
-            if (!senderIsCurrentUser && msg.sender_id === currentChatTarget) {
+
+          if (currentUser && msg.recipient_id === currentUser.id) { // Direct message to me
+             if(msg.sender_id === currentChatTarget && !currentChatIsGroup) { // Current DM chat is active
+                 appendMessage(msg.sender, msg.content, senderIsCurrentUser, msg.timestamp, msg.read_at, msg.id, msg.recipient_id, false);
                  sendWebSocketMessage('mark_read', { sender_id: msg.sender_id });
-            }
-            // Scroll only for new messages in the current view
-            chatMessages.scrollTop = chatMessages.scrollHeight; 
-          } else {
-            console.log('Received message for another chat/context:', msg);
-            // Increment unread count in the sidebar if it's a direct message to me
-            if (currentUser && msg.recipient_id === currentUser.id) {
-                 // ---- Start: Safeguard for new contacts ----
-                 if (!allUsers[msg.sender_id]) {
-                    console.log(`Message received from unknown sender ${msg.sender_id}. Refreshing contacts...`);
-                    // Fetch contacts to ensure the sender appears in the list
-                    await fetchContacts(); 
-                    // Now allUsers should contain the sender, proceed with UI update
-                    if (!allUsers[msg.sender_id]) {
-                        // If still not found after refresh, log an error, but maybe still update badge?
-                        console.error(`Sender ${msg.sender_id} still not found after contact refresh!`);
-                        // Decide how to handle this - maybe append a temporary item?
-                        // For now, we'll skip the badge update if the user is truly unknown.
-                    } else {
-                        // Sender exists now, update the badge
-                        updateUnreadBadge(msg.sender_id, true);
-                    }
-                 } else {
-                    // Sender is known, just update the badge
-                    updateUnreadBadge(msg.sender_id, true); 
-                 }
-                 // ---- End: Safeguard for new contacts ----
-                 // TODO: Update message preview in sidebar
-            }
+                 chatMessages.scrollTop = chatMessages.scrollHeight;
+             } else { // DM for another chat
+                  console.log('Received DM for inactive chat:', msg);
+                  // Safeguard for new contacts (existing)
+                  if (!allUsers[msg.sender_id]) {
+                     console.log(`Message received from unknown sender ${msg.sender_id}. Refreshing contacts...`);
+                     await fetchContacts();
+                     if (allUsers[msg.sender_id]) {
+                         updateUnreadBadge(msg.sender_id, false, true); // Update user badge
+                     } else { console.error(`Sender ${msg.sender_id} still not found!`); }
+                  } else {
+                     updateUnreadBadge(msg.sender_id, false, true); // Update user badge
+                  }
+             }
+          } else if (senderIsCurrentUser && msg.recipient_id === currentChatTarget && !currentChatIsGroup) { // My own DM to current target
+             appendMessage(msg.sender, msg.content, senderIsCurrentUser, msg.timestamp, msg.read_at, msg.id, msg.recipient_id, false);
+             chatMessages.scrollTop = chatMessages.scrollHeight;
+          } else if (msg.recipient_id === null) { // Broadcast message
+             // Handle broadcast if needed
           }
+
+        } else if (action === 'group_message') {
+           // --- Group Message Handling --- (NEW)
+           const msg = payload;
+           const senderIsCurrentUser = currentUser && msg.sender_id === currentUser.id;
+           console.log('Received group message:', msg);
+
+           if (msg.group_id === currentChatTarget && currentChatIsGroup) { // Group chat is active
+                // Assume payload has sender info {id, username}
+                const senderName = senderIsCurrentUser ? 'Me' : (msg.sender?.username || `User ${msg.sender_id}`);
+                appendMessage(senderName, msg.content, senderIsCurrentUser, msg.timestamp, null, msg.id, null, true, msg.group_id);
+                // TODO: Add group read receipts? For now, just scroll
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+           } else { // Group message for inactive chat
+                console.log('Received message for inactive group:', msg.group_id);
+                updateUnreadBadge(msg.group_id, true, true); // Update group badge
+                // TODO: Update group preview in sidebar?
+           }
+
+           // Hide typing indicator for the sender if they were typing in this group
+           if (payload.sender_id && groupTypingUsers[payload.group_id]?.[payload.sender_id]) {
+               clearTimeout(groupTypingUsers[payload.group_id][payload.sender_id].timeoutId);
+               delete groupTypingUsers[payload.group_id][payload.sender_id];
+               if (payload.group_id === currentChatTarget) updateGroupTypingIndicator();
+           }
+
         } else if (action === 'status_update') {
-          if (!payload) {
-            console.error('Error: Received status_update action without payload:', message);
-            return;
-          }
-          updateUserStatus(payload.user_id, payload.status_value, payload.last_seen);
+            // ... existing status update ...
         } else if (action === 'typing_update') {
-          if (!payload) {
-            console.error('Error: Received typing_update action without payload:', message);
-            return;
-          }
-          // Only show typing if it's from the currently selected user
-          if (payload.user_id === currentChatTarget) {
+            // --- Direct Message Typing --- (Existing)
+            if (!currentChatIsGroup && payload.user_id === currentChatTarget) {
               if (payload.is_typing) {
-                  showTypingIndicator(payload.username);
+                  showTypingIndicator(payload.username); // Simple DM typing
               } else {
                   hideTypingIndicator();
               }
-          }
-        } else if (action === 'messages_read') { 
-            if (!payload) { console.error('[WS Error]', 'messages_read missing payload', message); return; }
-            
-            console.log('[WS Action] messages_read:', payload);
-            
-            // Check if the reader is the currently active chat target
-            // payload.sender_id is the *original sender* of the messages that were read
-            // payload.reader_id is the user *who just read* the messages
-            if (currentUser && payload.reader_id === currentChatTarget) { 
-                console.log(`Active user ${currentChatTarget} read messages from ${payload.sender_id}. Updating icons.`);
-                updateReadStatusIcons(payload.reader_id); // Update icons based on who read them
-            } else {
-                console.log(`Read receipt received, but reader (${payload.reader_id}) is not current target (${currentChatTarget}). Ignoring icon update.`);
             }
-        } else if (action === 'connect' || action === 'disconnect') {
-            // These might be redundant if status_update handles online/offline
-            console.log(`Received legacy connect/disconnect for: ${payload.user || payload.user_id}`);
-            // Consider fetching all users again if needed, or relying on status_update
-            // fetchAllUsers(); 
-        } else if (action === 'ping') {
-           // ... (keep ping logic if used) ...
+        } else if (action === 'group_typing_update'){
+            // --- Group Typing Update --- (NEW)
+            const { group_id, user_id, username, is_typing } = payload;
+            if (!groupTypingUsers[group_id]) groupTypingUsers[group_id] = {};
+
+            const existingUserTyping = groupTypingUsers[group_id][user_id];
+            if (existingUserTyping) {
+                clearTimeout(existingUserTyping.timeoutId); // Clear previous timeout
+            }
+
+            if (is_typing) {
+                // Add/update user typing status with a timeout
+                groupTypingUsers[group_id][user_id] = {
+                    username: username,
+                    timeoutId: setTimeout(() => {
+                        delete groupTypingUsers[group_id][user_id];
+                        if (group_id === currentChatTarget) updateGroupTypingIndicator();
+                    }, 3000) // Clear after 3 seconds of inactivity
+                };
+            } else {
+                // Remove user if they stopped typing
+                delete groupTypingUsers[group_id][user_id];
+            }
+            // Update indicator only if the affected group is the current chat
+            if (group_id === currentChatTarget) updateGroupTypingIndicator();
+
+        } else if (action === 'messages_read') {
+            // ... existing read receipt (only works for DM) ...
         } else {
              console.warn('Unknown WebSocket action received:', action);
         }
@@ -585,7 +655,12 @@ document.addEventListener('DOMContentLoaded', () => {
       sendMessage();
       // Also send stopped_typing immediately after sending message
       clearTimeout(typingTimeout);
-      sendTypingStatus(false);
+      const actionStop = currentChatIsGroup ? 'group_stopped_typing' : 'stopped_typing';
+      const payload = currentChatIsGroup ? { group_id: currentChatTarget } : {};
+      if (typingTimeout) { // Only send stop if we were typing
+          console.log(`Sending action: ${actionStop}`);
+          websocket.send(JSON.stringify({ action: actionStop, payload: payload }));
+      }
       typingTimeout = null;
     }
   });
@@ -600,17 +675,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // window.location.href = 'index.html';
   });
 
-  // Typing Indicator Logic
+  // Typing Indicator Logic (Updated)
   messageInput.addEventListener('input', () => {
-      if (!websocket || websocket.readyState !== WebSocket.OPEN) return;
+      if (!websocket || websocket.readyState !== WebSocket.OPEN || !currentChatTarget) return;
+
+      // Determine action based on chat type
+      const actionStart = currentChatIsGroup ? 'group_typing' : 'typing';
+      const actionStop = currentChatIsGroup ? 'group_stopped_typing' : 'stopped_typing';
+      const payload = currentChatIsGroup ? { group_id: currentChatTarget } : {};
 
       if (!typingTimeout) {
-          sendTypingStatus(true); // Send typing start
+          console.log(`Sending action: ${actionStart}`);
+          websocket.send(JSON.stringify({ action: actionStart, payload: payload }));
       }
       clearTimeout(typingTimeout);
 
       typingTimeout = setTimeout(() => {
-          sendTypingStatus(false); // Send typing stop
+          console.log(`Sending action: ${actionStop}`);
+          websocket.send(JSON.stringify({ action: actionStop, payload: payload }));
           typingTimeout = null;
       }, 1500); // 1.5 seconds debounce
   });
@@ -625,43 +707,53 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- Functions ---
   function sendMessage() {
     const messageText = messageInput.value.trim();
-    if (messageText !== '' && websocket && websocket.readyState === WebSocket.OPEN) {
-      const messagePayload = {
+    if (messageText === '' || !websocket || websocket.readyState !== WebSocket.OPEN) return;
+
+    let action;
+    let payload;
+
+    if (currentChatIsGroup) {
+        action = 'group_message';
+        payload = {
+            group_id: currentChatTarget,
+            content: messageText
+        };
+    } else if (currentChatTarget) { // Direct message
+        action = 'message';
+        payload = {
         content: messageText,
-        recipient_id: currentChatTarget
-      };
-      console.log('Sending message payload:', messagePayload);
-      // Send message wrapped in standard action/payload structure
-      websocket.send(JSON.stringify({ action: 'message', payload: messagePayload }));
-      messageInput.value = '';
-
-      // Clear and stop typing indicator after sending
-      clearTimeout(typingTimeout);
-      sendTypingStatus(false);
-      typingTimeout = null;
-      hideTypingIndicator(); // Immediately hide own typing indicator
-
-    } else if (!websocket || websocket.readyState !== WebSocket.OPEN) {
-       console.warn('WebSocket is not connected. Cannot send message.');
-       appendSystemMessage('Not connected. Please wait or try logging in again.');
+            recipient_id: currentChatTarget
+        };
+    } else {
+        // Handle case where no chat is selected (e.g., broadcast or disable send)
+        console.warn('Send attempt with no active chat target.');
+        return; // Or send broadcast: action = 'message', payload = { content: messageText, recipient_id: null };
     }
+
+    console.log(`Sending WS Action: ${action}`, payload);
+    websocket.send(JSON.stringify({ action: action, payload: payload }));
+    messageInput.value = '';
+
+    // Clear and stop typing indicator after sending
+    clearTimeout(typingTimeout);
+    // sendTypingStatus(false); // Needs group support
+    typingTimeout = null;
+    hideTypingIndicator();
   }
 
-  // Modified appendMessage to use createElement and include recipientId dataset
-  function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = null, messageId = null, recipientId = null) {
+  // Modified appendMessage to handle groups
+  function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = null, messageId = null, recipientId = null, isGroup = false, groupId = null) {
     const messageGroup = document.createElement('div');
     messageGroup.classList.add('message-group');
     messageGroup.classList.add(isMe ? 'sender' : 'receiver');
     if (messageId) {
-        messageGroup.dataset.messageId = messageId;
-    }
-    if (isMe && recipientId) {
-        messageGroup.dataset.recipientId = recipientId;
+        messageGroup.dataset.messageId = messageId; // Still useful potentially
     }
 
     // Avatar
     const avatarImg = document.createElement('img');
-    avatarImg.src = "assets/images/default-avatar.png"; 
+    // Use different avatar logic for groups?
+    avatarImg.src = isGroup && !isMe ? "assets/svg/group-avatar.svg" : "assets/images/default-avatar.png";
     avatarImg.alt = "Avatar";
     avatarImg.classList.add('avatar');
 
@@ -669,10 +761,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const messageContentDiv = document.createElement('div');
     messageContentDiv.classList.add('message-content');
 
-    // Sender Name
+    // Sender Name (Always show for group messages from others)
     const senderNameSpan = document.createElement('span');
     senderNameSpan.classList.add('sender-name');
-    senderNameSpan.textContent = isMe ? 'Me' : sender;
+    senderNameSpan.textContent = (isGroup && !isMe) ? sender : (isMe ? 'Me' : sender);
+    // Only show sender name if it's a group message OR if needed for direct message styling
+    if (!isGroup && !isMe) { // Hide sender name for receiver in DMs if design prefers
+        // senderNameSpan.style.display = 'none';
+    }
 
     // Message Bubble
     const messageBubbleDiv = document.createElement('div');
@@ -690,17 +786,16 @@ document.addEventListener('DOMContentLoaded', () => {
     timestampSpan.classList.add('timestamp');
     timestampSpan.textContent = formattedTime;
 
-    // Read Status Icon Container
+    // Read Status Icon Container (Only for Sent DMs)
     const readStatusContainer = document.createElement('span');
     readStatusContainer.classList.add('read-status-icon-container');
-
-    if (isMe) {
+    if (isMe && !isGroup) {
         const readStatusIcon = document.createElement('img');
         const iconSrc = readAt ? 'assets/svg/read.svg' : 'assets/svg/unread.svg';
         readStatusIcon.src = iconSrc;
         readStatusIcon.alt = readAt ? 'Read' : 'Sent';
         readStatusIcon.classList.add('read-status-icon');
-        readStatusContainer.appendChild(readStatusIcon); 
+        readStatusContainer.appendChild(readStatusIcon);
     }
 
     // Assemble Meta
@@ -708,7 +803,10 @@ document.addEventListener('DOMContentLoaded', () => {
     messageMetaDiv.appendChild(readStatusContainer);
 
     // Assemble Content
-    messageContentDiv.appendChild(senderNameSpan);
+    // Only add sender name span if it should be visible
+    if (isGroup || isMe) { // Show sender name for groups or if it's me
+        messageContentDiv.appendChild(senderNameSpan);
+    }
     messageContentDiv.appendChild(messageBubbleDiv);
     messageContentDiv.appendChild(messageMetaDiv);
 
@@ -727,7 +825,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  // --- Update Read Status Icons --- // Updated logging
+  // --- Update Read Status Icons (No change needed, only for DMs) ---
   function updateReadStatusIcons(userIdWhoRead) {
     console.log(`Running updateReadStatusIcons for reader: ${userIdWhoRead}`);
     const sentMessages = chatMessages.querySelectorAll(`.message-group.sender`); 
@@ -775,6 +873,297 @@ document.addEventListener('DOMContentLoaded', () => {
   // --- New Chat Modal Listeners ---
   newChatButton?.addEventListener('click', () => toggleNewChatModal(true));
   closeNewChatModalButton?.addEventListener('click', () => toggleNewChatModal(false));
+
+  // --- Group Modal Listeners ---
+  createGroupButton?.addEventListener('click', () => toggleCreateGroupPopup(true));
+  closeCreateGroupPopup?.addEventListener('click', () => toggleCreateGroupPopup(false));
+  createGroupSubmitButton?.addEventListener('click', createGroup);
+
+  manageGroupMembersButton?.addEventListener('click', () => toggleManageMembersPopup(true));
+  closeManageMembersModal?.addEventListener('click', () => toggleManageMembersPopup(false));
+  addMemberButton?.addEventListener('click', () => {
+      const username = addMemberUsernameInput.value.trim();
+      if(username && currentChatIsGroup && currentChatTarget) {
+          addUserToGroup(currentChatTarget, username);
+      } else if (!username) {
+          addMemberStatus.textContent = 'Enter a username.';
+          addMemberStatus.className = 'add-member-status error';
+      } // Else handled within addUserToGroup
+  });
+
+  // --- Functions ---
+  async function fetchGroups() {
+    if (!accessToken) return;
+    allGroups = {};
+    if (groupListElement) groupListElement.innerHTML = ''; // Clear visually
+    console.log('Fetching groups...');
+
+    try {
+        // Use the new endpoint for fetching user's groups
+        const response = await fetch('http://127.0.0.1:8000/users/me/groups', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        if (response.ok) {
+            const groups = await response.json();
+            console.log('Fetched groups:', groups);
+            allGroups = groups.reduce((acc, group) => {
+                group.unread_count = 0; // Initialize unread count for groups
+                acc[group.id] = group;
+                return acc;
+            }, {});
+            populateGroupList(); // Populate sidebar
+        } else {
+            console.error('Failed to fetch groups:', response.status);
+            if(groupListElement) groupListElement.innerHTML = '<li style="padding: 10px; color: red;">Failed to load groups</li>';
+        }
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+        if(groupListElement) groupListElement.innerHTML = '<li style="padding: 10px; color: red;">Error loading groups</li>';
+    }
+  }
+
+  async function createGroup() {
+    const name = createGroupNameInput.value.trim();
+    const description = createGroupDescInput.value.trim();
+
+    if (!name) {
+        createGroupStatus.textContent = 'Group name is required.';
+        createGroupStatus.className = 'create-group-status error';
+        return;
+    }
+
+    createGroupStatus.textContent = 'Creating...';
+    createGroupStatus.className = 'create-group-status';
+    createGroupSubmitButton.disabled = true;
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/group/append', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ group_name: name, description: description })
+        });
+        const result = await response.json();
+
+        if (response.ok) {
+            createGroupStatus.textContent = `Group '${result.group_name}' created!`;
+            createGroupStatus.className = 'create-group-status success';
+            await fetchGroups(); // Refresh group list
+            setTimeout(() => toggleCreateGroupPopup(false), 1500);
+        } else {
+            createGroupStatus.textContent = `Error: ${result.detail || 'Failed to create group'}`;
+            createGroupStatus.className = 'create-group-status error';
+        }
+    } catch (error) {
+        console.error('Error creating group:', error);
+        createGroupStatus.textContent = 'Network error. Please try again.';
+        createGroupStatus.className = 'create-group-status error';
+    } finally {
+        createGroupSubmitButton.disabled = false;
+    }
+  }
+
+  // Updated Add User to Group (Uses Search API)
+  async function addUserToGroup(groupId, username) {
+      addMemberStatus.textContent = 'Searching user...';
+      addMemberStatus.className = 'add-member-status';
+      addMemberButton.disabled = true;
+      addMemberUsernameInput.disabled = true; // Disable input during process
+
+      let userId = null;
+      try {
+          // 1. Search for the user by username
+          const searchResponse = await fetch(`http://127.0.0.1:8000/users/search?username=${encodeURIComponent(username)}`, {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          if (!searchResponse.ok) {
+              throw new Error(`Search failed: ${searchResponse.status}`);
+          }
+          const searchResults = await searchResponse.json();
+
+          if (searchResults.length === 0) {
+              addMemberStatus.textContent = `Error: User '${username}' not found.`;
+              addMemberStatus.className = 'add-member-status error';
+              return; // Exit function
+          } else if (searchResults.length > 1) {
+              // TODO: Handle multiple matches - maybe show a list to select from?
+              addMemberStatus.textContent = `Error: Multiple users found for '${username}'. Be more specific.`;
+              addMemberStatus.className = 'add-member-status error';
+              return; // Exit function
+          } else {
+              userId = searchResults[0].id; // Found unique user
+              addMemberStatus.textContent = `Adding user '${searchResults[0].username}'...`;
+          }
+
+      } catch (error) {
+          console.error('Error searching user:', error);
+          addMemberStatus.textContent = 'Error finding user.';
+          addMemberStatus.className = 'add-member-status error';
+          return; // Exit function
+      } finally {
+           // Re-enable only if search failed before finding ID
+           if (userId === null) {
+                addMemberButton.disabled = false;
+                addMemberUsernameInput.disabled = false;
+           }
+      }
+
+      // 2. Add the user by ID if found
+      if (userId === null) return; // Should not happen if logic above is correct
+
+      try {
+          const addResponse = await fetch(`http://127.0.0.1:8000/group/add_user/${groupId}`, {
+              method: 'POST',
+              headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ user_id: userId })
+          });
+          const addResult = await addResponse.json();
+          if (addResponse.ok) {
+              addMemberStatus.textContent = `User '${username}' added successfully.`;
+              addMemberStatus.className = 'add-member-status success';
+              addMemberUsernameInput.value = ''; // Clear input
+              populateManageMembersModal(groupId); // Refresh member list in modal
+          } else {
+              addMemberStatus.textContent = `Error: ${addResult.detail || 'Failed to add user'}`;
+              addMemberStatus.className = 'add-member-status error';
+          }
+      } catch (error) {
+          console.error('Error adding user to group:', error);
+          addMemberStatus.textContent = 'Network error while adding.';
+          addMemberStatus.className = 'add-member-status error';
+      } finally {
+          addMemberButton.disabled = false;
+          addMemberUsernameInput.disabled = false;
+      }
+  }
+
+  async function removeUserFromGroup(groupId, userId, buttonElement) {
+      // Disable button temporarily
+      if (buttonElement) buttonElement.disabled = true;
+
+      if (!confirm(`Are you sure you want to remove this user from the group?`)) {
+          if (buttonElement) buttonElement.disabled = false;
+          return;
+      }
+
+      console.log(`Attempting to remove user ${userId} from group ${groupId}`);
+      try {
+          const response = await fetch(`http://127.0.0.1:8000/group/delete_user/${groupId}/${userId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          if (response.ok) {
+              console.log(`User ${userId} removed successfully.`);
+              populateManageMembersModal(groupId); // Refresh member list
+          } else {
+              const result = await response.json();
+              console.error('Failed to remove user:', result.detail);
+              alert(`Error removing user: ${result.detail || 'Unknown error'}`);
+              if (buttonElement) buttonElement.disabled = false;
+          }
+      } catch (error) {
+          console.error('Error removing user from group:', error);
+          alert('Network error while removing user.');
+          if (buttonElement) buttonElement.disabled = false;
+      }
+  }
+
+  async function fetchGroupDetails(groupId) {
+      console.log(`Fetching details for group ${groupId}`);
+      try {
+          const response = await fetch(`http://127.0.0.1:8000/groups/${groupId}`, {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          if (response.ok) {
+              const details = await response.json();
+              console.log('Group details:', details);
+              return details; // Return members and messages
+          } else {
+              console.error('Failed to fetch group details:', response.status);
+              return null;
+          }
+      } catch (error) {
+          console.error('Error fetching group details:', error);
+          return null;
+      }
+  }
+
+  // --- Populate Manage Members Modal (Add remove button listener arg) ---
+  async function populateManageMembersModal(groupId) {
+    if (!manageMembersModal || !groupMemberList) return;
+    groupMemberList.innerHTML = '<li>Loading members...</li>';
+
+    const details = await fetchGroupDetails(groupId);
+    groupMemberList.innerHTML = ''; // Clear loading/previous
+
+    if (details && details.members) {
+        if(details.members.length === 0) {
+             groupMemberList.innerHTML = '<li>No members found.</li>';
+        }
+        details.members.forEach(member => {
+            const li = document.createElement('li');
+            li.dataset.userId = member.id;
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = member.username + (member.id === currentUser.id ? ' (You)' : '');
+            li.appendChild(nameSpan);
+
+            // Add remove button (don't allow removing self?)
+            if (member.id !== currentUser.id) {
+                const removeButton = document.createElement('button');
+                removeButton.textContent = '×'; // Or use an icon
+                removeButton.classList.add('remove-member-button');
+                removeButton.title = `Remove ${member.username}`;
+                removeButton.onclick = () => removeUserFromGroup(groupId, member.id, removeButton); // Pass button
+                li.appendChild(removeButton);
+            }
+            groupMemberList.appendChild(li);
+        });
+    } else {
+        groupMemberList.innerHTML = '<li>Error loading members.</li>';
+    }
+  }
+
+  // --- Sidebar Population (Split into Users and Groups) ---
+  function populateSidebarLists() {
+      populateUserList();
+      populateGroupList();
+  }
+
+  function populateGroupList() {
+    if (!groupListElement) return;
+    groupListElement.innerHTML = ''; // Clear existing list
+
+    Object.values(allGroups).forEach(group => {
+        const listItem = document.createElement('li');
+        listItem.classList.add('group-item'); // Use group-item class
+        listItem.dataset.groupId = group.id;
+
+        const unreadCount = group.unread_count || 0; // Use group unread count
+
+        // Simplified display for groups
+        listItem.innerHTML = `
+            <div class="avatar-container">
+                <img src="assets/svg/group-avatar.svg" alt="Group Avatar" class="avatar"> <!-- Default Group Avatar -->
+            </div>
+            <div class="contact-info">
+                <span class="contact-name">${group.group_name}</span>
+                <span class="contact-preview"></span> <!-- TODO: Group Preview -->
+            </div>
+            <div class="contact-meta">
+                <span class="timestamp"></span> <!-- TODO: Timestamp -->
+                <span class="unread-count" style="display: ${unreadCount > 0 ? 'inline-block' : 'none'};">${unreadCount}</span>
+            </div>
+        `;
+
+        listItem.addEventListener('click', () => selectChat(group.id, true)); // Pass isGroup=true
+        groupListElement.appendChild(listItem);
+    });
+  }
 
   // --- Initial connection ---
   connectWebSocket();

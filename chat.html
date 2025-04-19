@@ -14,6 +14,9 @@
       <div class="sidebar-header">
         <div class="logo">AITC</div>
         <div class="sidebar-actions">
+            <button class="icon-button" id="create-group-button" aria-label="Create Group">
+                <img src="assets/svg/users-plus.svg" alt="Create Group" class="icon-svg">
+            </button>
             <button class="icon-button" aria-label="Users" id="users-button">
                 <img src="assets/svg/users.svg" alt="Users" class="icon-svg">
             </button>
@@ -34,6 +37,18 @@
           <div id="add-contact-status" class="add-contact-status"></div>
       </div>
       
+      <!-- Create Group Popup (Initially Hidden) -->
+      <div id="create-group-popup" class="create-group-popup">
+          <button class="close-popup-button" id="close-create-group-popup" aria-label="Close">&times;</button>
+          <h4>Create New Group</h4>
+          <div class="create-group-form">
+              <input type="text" id="create-group-name" placeholder="Group name" required>
+              <textarea id="create-group-description" placeholder="Group description (optional)" rows="2"></textarea>
+              <button id="create-group-submit-button">Create Group</button>
+          </div>
+          <div id="create-group-status" class="create-group-status"></div>
+      </div>
+      
       <div class="search-bar">
         <input type="search" id="search-input" placeholder="Search messages, people">
         <button class="icon-button" aria-label="Search">
@@ -41,18 +56,18 @@
         </button>
       </div>
       <div class="contact-list-container">
-        <div class="pinned-chats">
-          <h2 class="list-header">
-            <img src="assets/svg/pinned.svg" alt="Pinned" class="header-icon-svg">
-            <span>PINNED CHATS</span>
-          </h2>
-          <ul id="pinned-list">
-          </ul>
+        <div class="group-list messages">
+            <h2 class="list-header">
+               <img src="assets/svg/groups.svg" alt="Groups" class="header-icon-svg">
+               <span>GROUPS</span>
+            </h2>
+            <ul id="group-list">
+            </ul>
         </div>
         <div class="all-messages">
           <h2 class="list-header">
              <img src="assets/svg/chats.svg" alt="Messages" class="header-icon-svg">
-             <span>ALL MESSAGES</span>
+             <span>DIRECT MESSAGES</span>
           </h2>
           <ul id="user-list">
           </ul>
@@ -62,31 +77,20 @@
       <!-- Add New Chat Button -->
       <button id="new-chat-button" class="new-chat-button" aria-label="Start New Chat">
           <img src="assets/svg/plu-icon.svg" alt="New Chat" class="icon-svg">
-          <!-- Or use text like "+" -->
       </button>
 
       <!-- New Chat Modal (Initially Hidden) -->
       <div id="new-chat-modal" class="new-chat-modal">
           <button class="close-popup-button" id="close-new-chat-modal" aria-label="Close">&times;</button>
           <h4>Start New Chat</h4>
-          <!-- Optional Search for contacts within modal -->
-          <!-- <input type="search" id="new-chat-search" placeholder="Search contacts..."> -->
           <ul id="new-chat-contact-list" class="new-chat-contact-list">
-              <!-- Contacts will be populated here by JS -->
           </ul>
       </div>
 
     </aside>
 
     <!-- Main Chat Area -->
-    <!-- Add chat-disabled class initially -->
     <main class="chat-area chat-disabled">
-      <!-- Add Placeholder -->
-      <!-- <div class="chat-placeholder"> -->
-        <!-- <h2>Select a chat to start messaging</h2> -->
-        <!-- Optional: Add an icon or illustration here -->
-      <!-- </div> -->
-
       <header class="chat-header">
         <div class="contact-details">
           <div class="avatar-container">
@@ -95,10 +99,13 @@
           </div>
           <div class="contact-info">
             <span class="contact-name" id="chat-header-name">Select a chat</span>
-            <span class="contact-status" id="chat-header-status">Offline</span>
+            <span class="contact-status" id="chat-header-status">Offline / Group Info</span>
           </div>
         </div>
         <div class="chat-actions">
+            <button class="icon-button" id="manage-group-members-button" aria-label="Manage Members" style="display: none;">
+                <img src="assets/svg/users-manage.svg" alt="Manage Members" class="icon-svg">
+            </button>
             <button class="icon-button" aria-label="Video Call">📹</button>
             <button class="icon-button" aria-label="Phone Call">📞</button>
             <button class="icon-button" aria-label="More Options">⋮</button>
@@ -121,6 +128,22 @@
             <img src="assets/svg/send.svg" alt="Send" class="icon-svg send-icon">
         </button>
       </footer>
+
+      <!-- Manage Group Members Modal (Initially Hidden) -->
+      <div id="manage-members-modal" class="manage-members-modal">
+        <button class="close-popup-button" id="close-manage-members-modal" aria-label="Close">&times;</button>
+        <h4>Group Members</h4>
+        <div class="add-member-section">
+            <h5>Add Member</h5>
+            <input type="text" id="add-member-username" placeholder="Enter username to add">
+            <button id="add-member-button">Add</button>
+            <div id="add-member-status" class="add-member-status"></div>
+        </div>
+        <h5>Current Members</h5>
+        <ul id="group-member-list" class="group-member-list">
+        </ul>
+      </div>
+
     </main>
   </div>
   <script src="js/chat.js"></script>
