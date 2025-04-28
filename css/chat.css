@@ -191,7 +191,17 @@ body {
 
 .chat-list-item.active {
   background-color: var(--color-bg-contact-active);
-  border-right: 3px solid var(--color-text-logo); /* style based on fill_0CGEZY & stroke_TVU6O8 */
+  position: relative;
+}
+
+.chat-list-item.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--color-text-logo);
 }
 
 .chat-list-item .avatar-container {
@@ -486,14 +496,14 @@ body {
   background-color: var(--color-bg-message-receiver);
   color: var(--color-text-primary);
   border: 1px solid var(--color-border-light);
-  border-top-left-radius: 0; /* Based on Figma */
+  border-bottom-left-radius: 0; /* Based on Figma */
 }
 
 .message-group.sender .message-bubble {
   background-color: var(--color-bg-message-sender);
   color: var(--color-text-light);
   border: 1px solid var(--color-text-logo);
-  border-top-right-radius: 0; /* Based on Figma */
+  border-bottom-right-radius: 0; /* Based on Figma */
 }
 
 .timestamp {
@@ -624,6 +634,13 @@ body {
     font-weight: 500; /* Make username bold */
 }
 
+.no-chats-message{
+  font-size: 16px;
+  color: var(--color-text-secondary);
+  margin-top: 20px;
+  text-align: center;
+}
+
 /* Styles for Disabled Chat Area */
 .chat-placeholder {
   display: none; /* Hidden by default */
@@ -635,11 +652,21 @@ body {
   text-align: center;
   color: var(--color-text-secondary);
   padding: 40px;
+  background-color: var(--color-bg-main);
+  height: 100%;
 }
 
 .chat-placeholder h2 {
-  font-size: 20px;
-  font-weight: 500;
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: var(--color-text-logo);
+}
+
+.chat-placeholder p {
+  font-size: 16px;
+  max-width: 80%;
+  line-height: 1.6;
 }
 
 .chat-area.chat-disabled .chat-placeholder {
@@ -712,7 +739,7 @@ body {
 }
 
 /* Add Contact Popup Styles */
-.add-contact-popup {
+.add-contact-popup, .new-chat-modal {
   display: none; /* Hidden by default */
   position: fixed; /* Center on screen */
   top: 50%;
@@ -725,10 +752,9 @@ body {
   padding: 25px; /* Match group popup */
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15); /* Match group popup */
   z-index: 1000; /* Ensure it's above everything */
-  text-align: center; /* Center content */
 }
 
-.add-contact-popup.visible {
+.add-contact-popup.visible, .new-chat-modal.visible {
   display: block; /* Show when class is added */
 }
 
@@ -849,7 +875,7 @@ body {
     background-color: var(--color-bg-sidebar);
     border: 1px solid var(--color-border-medium);
     border-radius: 10px;
-    padding: 20px 0px;
+    padding: 20px 0px; /* Specific padding - no horizontal padding */
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
     z-index: 100; /* Above other sidebar content */
 }
@@ -864,7 +890,8 @@ body {
     font-size: 18px;
     font-weight: 600;
     color: var(--color-text-primary);
-    text-align: center;
+    text-align: center; /* Center the title */
+    padding: 0 15px; /* Add horizontal padding to the title */
 }
 
 /* Re-use close button style */
@@ -907,6 +934,15 @@ body {
 .new-chat-contact-list .contact-item .avatar {
     width: 35px; 
     height: 35px;
+
+}
+
+.status-indicator{
+  border-radius: 50%;
+}
+
+.avatar{
+  border-radius: 50%;
 }
 .new-chat-contact-list .contact-item .status-indicator {
     width: 10px;
@@ -923,7 +959,7 @@ body {
 }
 
 /* --- Create Group Popup Styles --- */
-.create-group-popup {
+.create-group-popup, .manage-members-modal, .profile-modal, .edit-group-modal {
     position: fixed;
     top: 50%;
     left: 50%;
@@ -942,11 +978,15 @@ body {
     gap: 15px;
 }
 
-.create-group-popup.visible {
+.create-group-popup.visible, 
+.manage-members-modal.visible, 
+.profile-modal.visible, 
+.edit-group-modal.visible {
     display: flex;
 }
 
-.create-group-popup .close-popup-button {
+/* Consistent close button styling across all modals */
+.close-popup-button {
     position: absolute;
     top: 15px;
     right: 15px;
@@ -955,6 +995,11 @@ body {
     border: none;
     cursor: pointer;
     color: #777;
+    transition: color 0.2s ease;
+}
+
+.close-popup-button:hover {
+    color: #333;
 }
 
 /* Group Header */
@@ -1216,15 +1261,30 @@ body {
     cursor: pointer;
     border-bottom: 1px solid var(--color-border-light);
     transition: background-color 0.2s ease;
+    position: relative;
 }
 
 .group-item:hover {
   background-color: #f0f0f0;
 }
 
+.group-item.active::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: var(--color-text-logo);
+}
+
 .group-item.active {
   background-color: var(--color-bg-contact-active);
-  border-right: 3px solid var(--color-text-logo); 
+}
+
+/* Fixing specificity issue with active class */
+#group-list .group-item:not(.active) {
+  background-color: transparent;
 }
 
 /* Style group avatar/icon differently if needed */
@@ -1335,6 +1395,25 @@ body {
     transition: background-color 0.2s;
 }
 
+.search-result-item{
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(0, 163, 255, 0);
+  transition: background-color 0.2s;
+}
+
+
+.search-result-item .avatar {
+
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 10px;
+
+}
 .group-member-list li:hover {
     background: rgba(0, 163, 255, 0.1);
 }
@@ -1562,48 +1641,256 @@ body {
 
 /* New Profile Modal Styles (similar to others) */
 .profile-modal {
-    display: none; /* Hidden by default */
-    position: fixed; 
-    top: 50%; 
+    display: none;
+    position: fixed;
+    top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%); 
-    width: 90%; 
-    max-width: 350px; /* Adjust as needed */
-    background-color: var(--color-bg-sidebar);
-    border: 1px solid var(--color-border-medium);
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    background-color: #FCFCFC;
     border-radius: 10px;
-    padding: 25px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    z-index: 1000; 
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+    z-index: 1001; /* Higher than other modals */
+    overflow-y: auto;
 }
 
-.profile-modal.visible {
-    display: block; 
+.profile-container {
+  padding: 20px;
 }
 
-.profile-modal h4 {
-    margin-top: 0;
-    margin-bottom: 20px;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    text-align: center;
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.profile-modal .close-popup-button {
-    /* Inherit from existing close button styles if defined globally,
-       otherwise copy styles from .add-contact-popup .close-popup-button */
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    background: none;
-    border: none;
-    font-size: 24px;
-    font-weight: bold;
-    color: var(--color-text-secondary);
-    cursor: pointer;
-    line-height: 1;
-    padding: 5px;
+.profile-avatar-container {
+  position: relative;
+  margin-bottom: 15px;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-avatar-edit {
+  position: absolute;
+  right: -5px;
+  bottom: 0;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.edit-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.profile-username {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 20px;
+  color: #1E1E1E;
+  margin: 5px 0;
+}
+
+.profile-theme {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  color: #717171;
+  margin-top: 5px;
+}
+
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.switch-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.switch-label-container {
+  flex-grow: 1;
+}
+
+.switch-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: #1E1E1E;
+}
+
+/* Switch toggle styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #2C2C2C;
+  transition: .4s;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #F5F5F5;
+  transition: .4s;
+}
+
+input:checked + .slider {
+  background-color: #00A3FF;
+}
+
+input:checked + .slider:before {
+  transform: translateX(26px);
+}
+
+.slider.round {
+  border-radius: 34px;
+}
+
+.slider.round:before {
+  border-radius: 50%;
+}
+
+.input-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.input-field label {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: #1E1E1E;
+}
+
+.input-field input {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: #717171;
+  padding: 12px 16px;
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.textarea-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.textarea-field label {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: #1E1E1E;
+}
+
+.textarea-field textarea {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: #717171;
+  padding: 12px 16px;
+  border: 1px solid #D9D9D9;
+  border-radius: 8px;
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.save-profile-button {
+  background-color: #00A3FF;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background-color 0.3s;
+}
+
+.save-profile-button:hover {
+  background-color: #0087d1;
+}
+
+.delete-account {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.delete-account-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: #FA2222;
+}
+
+.delete-account-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+}
+
+.delete-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.password-change-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.3s;
 }
 
 /* NEW: Styles for Add Contact search results */

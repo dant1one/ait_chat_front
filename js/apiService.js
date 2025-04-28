@@ -68,10 +68,15 @@ export async function fetchGroups() {
     return request('/users/me/groups');
 }
 
-export async function createGroup(groupName, description) {
+export async function createGroup(groupName, description, memberIds) {
+    const payload = {
+        group_name: groupName,
+        description: description || null,
+        member_ids: memberIds || []
+    };
     return request('/group/append', {
         method: 'POST',
-        body: JSON.stringify({ group_name: groupName, description: description })
+        body: JSON.stringify(payload)
     });
 }
 
@@ -156,3 +161,59 @@ export async function uploadMediaFile(file) {
     });
 }
 // --- END: Media Upload Function ---
+
+// --- NEW: User Profile Functions ---
+export async function updateUsername(username) {
+    return request('/users/me/username', {
+        method: 'PATCH',
+        body: JSON.stringify({ username })
+    });
+}
+
+export async function updateEmail(email) {
+    return request('/users/me/email', {
+        method: 'PATCH',
+        body: JSON.stringify({ email })
+    });
+}
+
+export async function updateDescription(description) {
+    return request('/users/me/description', {
+        method: 'PATCH',
+        body: JSON.stringify({ description })
+    });
+}
+
+export async function updateNickname(nickname) {
+    return request('/users/me/nickname', {
+        method: 'PATCH',
+        body: JSON.stringify({ nickname })
+    });
+}
+
+export async function updatePassword(currentPassword, newPassword) {
+    return request('/users/me/password', {
+        method: 'PATCH',
+        body: JSON.stringify({ 
+            current_password: currentPassword, 
+            new_password: newPassword 
+        })
+    });
+}
+
+export async function uploadUserAvatar(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return request('/users/me/avatar', {
+        method: 'POST',
+        body: formData
+    });
+}
+
+export async function deleteUserAccount() {
+    return request('/users/me', {
+        method: 'DELETE'
+    });
+}
+// --- END: User Profile Functions ---

@@ -20,6 +20,185 @@ document.addEventListener('DOMContentLoaded', async () => {
     uiService.disableChatArea(true); // Start with chat disabled
     uiService.hideChatActionsButton(); // Hide 3-dots initially
 
+    // --- NEW: Profile Settings Handlers ---
+    const profileAvatarInput = document.getElementById('profile-avatar-input');
+    const profileAvatarEdit = document.getElementById('profile-avatar-edit');
+    const changePasswordToggle = document.getElementById('change-password-toggle');
+    const passwordChangeFields = document.getElementById('password-change-fields');
+    const saveProfileButton = document.getElementById('save-profile');
+    const deleteAccountButton = document.getElementById('delete-account-button');
+    const sidebarProfileHeader = document.getElementById('sidebar-profile-header');
+    
+    // Toggle profile modal when clicking on the profile header
+    if (sidebarProfileHeader) {
+        sidebarProfileHeader.addEventListener('click', () => {
+            // Populate profile fields with current user data
+            const currentUser = stateService.getCurrentUser();
+            if (currentUser) {
+                document.getElementById('profile-username').textContent = currentUser.username || '';
+                document.getElementById('profile-nickname').value = currentUser.nickname || '';
+                document.getElementById('profile-email').value = currentUser.email || '';
+                document.getElementById('profile-description').value = currentUser.description || '';
+                
+                // Set avatar if available
+                if (currentUser.avatar_url) {
+                    document.getElementById('profile-avatar').src = currentUser.avatar_url;
+                }
+            }
+            
+            uiService.toggleProfileModal(true);
+        });
+    }
+    
+    // Edit profile avatar
+    if (profileAvatarEdit) {
+        profileAvatarEdit.addEventListener('click', () => {
+            profileAvatarInput.click();
+        });
+    }
+    
+    // Handle avatar file selection
+    if (profileAvatarInput) {
+        profileAvatarInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('profile-avatar').src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+    
+    // Toggle password change fields
+    if (changePasswordToggle) {
+        changePasswordToggle.addEventListener('change', (event) => {
+            if (passwordChangeFields) {
+                passwordChangeFields.style.display = event.target.checked ? 'block' : 'none';
+            }
+        });
+    }
+    
+    // Save profile changes
+    if (saveProfileButton) {
+        saveProfileButton.addEventListener('click', async () => {
+            const nickname = document.getElementById('profile-nickname').value;
+            const email = document.getElementById('profile-email').value;
+            const description = document.getElementById('profile-description').value;
+            const avatarFile = profileAvatarInput.files[0];
+            
+            try {
+                // Update user profile
+                saveProfileButton.textContent = 'Saving...';
+                saveProfileButton.disabled = true;
+                
+                // Array to store all update promises
+                const updatePromises = [];
+                let updatedUser = stateService.getCurrentUser() || {};
+                
+                // Update each field individually using PATCH endpoints
+                if (nickname) {
+                    updatePromises.push(
+                        apiService.updateNickname(nickname)
+                            .then(result => {
+                                updatedUser.nickname = result.nickname || nickname;
+                                return result;
+                            })
+                    );
+                }
+                
+                if (email) {
+                    updatePromises.push(
+                        apiService.updateEmail(email)
+                            .then(result => {
+                                updatedUser.email = result.email || email;
+                                return result;
+                            })
+                    );
+                }
+                
+                if (description) {
+                    updatePromises.push(
+                        apiService.updateDescription(description)
+                            .then(result => {
+                                updatedUser.description = result.description || description;
+                                return result;
+                            })
+                    );
+                }
+                
+                // Add password change if toggled
+                if (changePasswordToggle.checked) {
+                    const currentPassword = document.getElementById('current-password').value;
+                    const newPassword = document.getElementById('new-password').value;
+                    const confirmPassword = document.getElementById('confirm-password').value;
+                    
+                    if (!currentPassword || !newPassword || !confirmPassword) {
+                        throw { detail: 'All password fields are required' };
+                    }
+                    
+                    if (newPassword !== confirmPassword) {
+                        throw { detail: 'New passwords do not match' };
+                    }
+                    
+                    updatePromises.push(
+                        apiService.updatePassword(currentPassword, newPassword)
+                            .then(result => {
+                                return result;
+                            })
+                    );
+                }
+                
+                // Wait for all updates to complete
+                const results = await Promise.all(updatePromises);
+                
+                // Upload avatar if selected
+                if (avatarFile) {
+                    const avatarResult = await apiService.uploadUserAvatar(avatarFile);
+                    updatedUser.avatar_url = avatarResult.avatar_url;
+                }
+                
+                // Fetch updated user data to ensure we have the latest
+                const refreshedUser = await apiService.fetchCurrentUser();
+                
+                // Update local state with complete user data
+                stateService.setCurrentUser(refreshedUser);
+                
+                // Update UI
+                uiService.populateSidebarHeader(refreshedUser);
+                
+                alert('Profile updated successfully');
+                uiService.toggleProfileModal(false);
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                alert(`Error updating profile: ${error.detail || 'Unknown error'}`);
+            } finally {
+                saveProfileButton.textContent = 'Save Changes';
+                saveProfileButton.disabled = false;
+            }
+        });
+    }
+    
+    // Handle delete account
+    if (deleteAccountButton) {
+        deleteAccountButton.addEventListener('click', async () => {
+            const confirmed = confirm('Are you sure you want to delete your account? This action cannot be undone.');
+            if (confirmed) {
+                try {
+                    deleteAccountButton.disabled = true;
+                    await apiService.deleteUserAccount();
+                    authService.logout(); // Log out and redirect to login page
+                } catch (error) {
+                    console.error('Error deleting account:', error);
+                    alert(`Error deleting account: ${error.detail || 'Unknown error'}`);
+                    deleteAccountButton.disabled = false;
+                }
+            }
+        });
+    }
+    // --- END: Profile Settings Handlers ---
+
     // --- Setup WebSocket Handlers ---
     websocketService.setOnOpen(() => {
         uiService.appendSystemMessage('Connected to chat.');
@@ -713,10 +892,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const result = await apiService.addContact(username); 
             uiService.setAddContactStatus(`User '${result.username}' added!`);
             stateService.addContactToState(result); // Add to local state
-            // uiService.populateUserList(stateService.getContacts()); // Refresh UI list // OLD
-            // Update combined list state (need a function for adding) and refresh UI
-            // For now, manual refresh might be needed or re-fetch all data
-            uiService.populateChatList(stateService.getCombinedSortedChatList()); // Attempt refresh
+            // NEW: Add to combined list
+            stateService.addContactToCombinedList(result);
+            // Update the UI
+            uiService.populateChatList(stateService.getCombinedSortedChatList());
             
             // Clear the search input
             if(elements.addContactUsernameInput) elements.addContactUsernameInput.value = '';
@@ -745,23 +924,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         uiService.setCreateGroupLoading(true);
 
         try {
-            const result = await apiService.createGroup(name, description);
-            
-            // Add members to the group (if any were selected)
-            const promises = memberIds
-                .filter(id => id !== stateService.getCurrentUserId().toString()) // Skip self (already added as admin)
-                .map(userId => apiService.addUserToGroup(result.id, parseInt(userId, 10)));
-                
-            if (promises.length > 0) {
-                await Promise.all(promises);
-            }
+            // Pass memberIds directly to the createGroup function
+            const result = await apiService.createGroup(name, description, memberIds.map(id => parseInt(id, 10))); // Ensure IDs are numbers
             
             uiService.setCreateGroupStatus(`Group '${result.group_name}' created!`);
             stateService.addGroupToState(result); // Add new group to state
-            // uiService.populateGroupList(stateService.getGroups()); // Refresh UI list // OLD
-             // Update combined list state and refresh UI
-            // TODO: Add stateService.addChatItem for groups
-            uiService.populateChatList(stateService.getCombinedSortedChatList()); // Attempt refresh
+            // NEW: Add to combined list
+            stateService.addGroupToCombinedList(result);
+            // Update the UI
+            uiService.populateChatList(stateService.getCombinedSortedChatList());
             setTimeout(() => uiService.toggleCreateGroupPopup(false), 1500);
         } catch (error) {
             console.error('Error creating group:', error);

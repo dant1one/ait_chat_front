@@ -152,7 +152,7 @@ export function initializeCombinedList(contacts, groups) {
         id: user.id,
         type: 'user',
         name: user.username,
-        avatarUrl: user.avatar_url || 'assets/images/default-avatar.png',
+        avatarUrl: user.avatar_url || 'assets/images/defailu-avatar.jpg',
         lastMessageTimestamp: null, // Will be updated by WS
         lastMessagePreview: 'No messages yet',
         unreadCount: user.unread_count || 0,
@@ -175,6 +175,52 @@ export function initializeCombinedList(contacts, groups) {
     // Initial sort (e.g., alphabetically) might be helpful before first message
     combinedChatList.sort((a, b) => a.name.localeCompare(b.name)); 
     console.log("Initialized combined chat list:", combinedChatList);
+}
+
+// Add a new contact to the combined chat list
+export function addContactToCombinedList(contact) {
+    // Check if already exists
+    const existingIndex = combinedChatList.findIndex(item => 
+        item.id === contact.id && item.type === 'user'
+    );
+    
+    if (existingIndex === -1) {
+        // Add a new item
+        combinedChatList.push({
+            id: contact.id,
+            type: 'user',
+            name: contact.username,
+            avatarUrl: contact.avatar_url || 'assets/images/defailu-avatar.jpg',
+            lastMessageTimestamp: null,
+            lastMessagePreview: 'No messages yet',
+            unreadCount: contact.unread_count || 0,
+            isOnline: contact.is_online || false,
+            lastSeen: contact.last_seen || null
+        });
+        console.log(`Added new contact ${contact.username} to combined list`);
+    }
+}
+
+// Add a new group to the combined chat list
+export function addGroupToCombinedList(group) {
+    // Check if already exists
+    const existingIndex = combinedChatList.findIndex(item => 
+        item.id === group.id && item.type === 'group'
+    );
+    
+    if (existingIndex === -1) {
+        // Add a new item
+        combinedChatList.push({
+            id: group.id,
+            type: 'group',
+            name: group.group_name,
+            avatarUrl: group.avatar_url || 'assets/svg/group-avatar.svg',
+            lastMessageTimestamp: null,
+            lastMessagePreview: 'No messages yet',
+            unreadCount: group.unread_count || 0
+        });
+        console.log(`Added new group ${group.group_name} to combined list`);
+    }
 }
 
 // Update an item in the list when a message arrives

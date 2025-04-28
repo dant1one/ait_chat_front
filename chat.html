@@ -16,7 +16,7 @@
       <div class="sidebar-header">
         <!-- NEW: Profile Header Area -->
         <div id="sidebar-profile-header" class="sidebar-profile-header">
-            <img src="assets/images/default-avatar.png" alt="My Avatar" class="avatar" id="sidebar-profile-avatar">
+            <img src="assets/images/assets/images/defailu-avatar.jpg" alt="My Avatar" class="avatar" id="sidebar-profile-avatar">
             <span id="sidebar-profile-username" class="username">Loading...</span>
         </div>
         <!-- Settings button moved here -->
@@ -92,9 +92,81 @@
       <!-- NEW: Profile Modal (Initially Hidden) -->
       <div id="profile-modal" class="profile-modal">
           <button class="close-popup-button" id="close-profile-modal" aria-label="Close">&times;</button>
-          <h4>My Profile</h4>
-          <!-- Profile content will go here later -->
-          <p>Profile details coming soon...</p> 
+          <div class="profile-container">
+              <div class="profile-header">
+                  <div class="profile-avatar-container">
+                      <img id="profile-avatar" src="assets/images/default-avatar.jpg" alt="Avatar" class="profile-avatar">
+                      <button id="profile-avatar-edit" class="profile-avatar-edit">
+                          <img src="assets/svg/edit-3.svg" alt="Edit" class="edit-icon">
+                      </button>
+                      <input type="file" id="profile-avatar-input" accept="image/*" style="display: none;">
+                  </div>
+                  <h3 id="profile-username" class="profile-username">Loading...</h3>
+                  <p id="profile-theme" class="profile-theme">Current theme: Light</p>
+              </div>
+              
+              <div class="profile-body">
+                  <div class="switch-field">
+                      <div class="switch-label-container">
+                          <label class="switch-label">Device theme</label>
+                      </div>
+                      <label class="switch">
+                          <input type="checkbox" id="theme-toggle">
+                          <span class="slider round"></span>
+                      </label>
+                  </div>
+                  
+                  <div class="input-field">
+                      <label for="profile-nickname">Nickname</label>
+                      <input type="text" id="profile-nickname" placeholder="@username">
+                  </div>
+                  
+                  <div class="input-field">
+                      <label for="profile-email">Email</label>
+                      <input type="email" id="profile-email" placeholder="email@example.com">
+                  </div>
+                  
+                  <div class="textarea-field">
+                      <label for="profile-description">Description</label>
+                      <textarea id="profile-description" placeholder="Write about yourself..."></textarea>
+                  </div>
+                  
+                  <div class="switch-field">
+                      <div class="switch-label-container">
+                          <label class="switch-label">Change password</label>
+                      </div>
+                      <label class="switch">
+                          <input type="checkbox" id="change-password-toggle">
+                          <span class="slider round"></span>
+                      </label>
+                  </div>
+                  
+                  <!-- Password change fields (initially hidden) -->
+                  <div id="password-change-fields" class="password-change-fields" style="display: none;">
+                      <div class="input-field">
+                          <label for="current-password">Current Password</label>
+                          <input type="password" id="current-password">
+                      </div>
+                      <div class="input-field">
+                          <label for="new-password">New Password</label>
+                          <input type="password" id="new-password">
+                      </div>
+                      <div class="input-field">
+                          <label for="confirm-password">Confirm Password</label>
+                          <input type="password" id="confirm-password">
+                      </div>
+                  </div>
+                  
+                  <button id="save-profile" class="save-profile-button">Save Changes</button>
+                  
+                  <div class="delete-account">
+                      <label for="delete-account-button" class="delete-account-label">Delete account</label>
+                      <button id="delete-account-button" class="delete-account-button">
+                          <img src="assets/svg/trash-2.svg" alt="Delete" class="delete-icon">
+                      </button>
+                  </div>
+              </div>
+          </div>
       </div>
       
       <div class="search-bar">
@@ -138,7 +210,7 @@
         <div class="contact-details">
           <div class="avatar-container">
             <!-- Use specific ID for group avatar in header -->
-            <img src="assets/images/default-avatar.png" alt="Avatar" class="avatar" id="chat-header-avatar">
+            <img src="assets/images/assets/images/defailu-avatar.jpg" alt="Avatar" class="avatar" id="chat-header-avatar">
             <div class="status-indicator offline" id="chat-header-status-indicator"></div>
           </div>
           <div class="contact-info">
@@ -147,8 +219,8 @@
           </div>
         </div>
         <div class="chat-actions">
-            <button class="icon-button" aria-label="Video Call">📹</button>
-            <button class="icon-button" aria-label="Phone Call">📞</button>
+            <button class="icon-button" aria-label="Video Call"></button>
+            <button class="icon-button" aria-label="Phone Call"></button>
             <button class="icon-button" id="chat-header-more-options" aria-label="More Options">⋮</button>
             <button class="logout-button">Logout</button>
 
@@ -211,7 +283,7 @@
         
         <!-- Group Info Header -->
         <div class="group-info-header">
-            <img id="group-avatar" src="assets/images/default-avatar.png" alt="Group" class="group-avatar">
+            <img id="group-avatar" src="assets/images/assets/images/defailu-avatar.jpg" alt="Group" class="group-avatar">
             <h3 id="group-name-header" class="group-name-header">Group Name</h3>
             <span id="group-members-count" class="group-members-count">0 members</span>
         </div>

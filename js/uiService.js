@@ -104,10 +104,10 @@ export function populateChatList(chatItems) {
             listItem.dataset.groupId = item.id;
         }
 
-        // Determine active state
+        // Determine active state: match id AND correct chat type
         const isActive = item.id === stateService.getCurrentChatTarget() && 
-                         (item.type === 'user' && !stateService.isGroupChat()) || 
-                         (item.type === 'group' && stateService.isGroupChat());
+                         ((item.type === 'user' && !stateService.isGroupChat()) || 
+                          (item.type === 'group' && stateService.isGroupChat()));
         if (isActive) {
             listItem.classList.add('active');
         }
@@ -181,7 +181,7 @@ export function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = 
     }
 
     const avatarImg = document.createElement('img');
-    avatarImg.src = isGroup && !isMe ? "assets/svg/group-avatar.svg" : "assets/images/default-avatar.png";
+    avatarImg.src = isGroup && !isMe ? "assets/svg/group-avatar.svg" : "assets/images/defailu-avatar.jpg";
     avatarImg.alt = "Avatar";
     avatarImg.classList.add('avatar');
 
@@ -419,12 +419,25 @@ export function updateChatHeaderStatus(groupDetails = null) { // Pass group deta
 }
 
 export function updateActiveListItem(targetId, isGroup) {
-     document.querySelectorAll('.chat-list-item').forEach(item => item.classList.remove('active'));
-     const listElement = elements.chatListElement;
-     if (!listElement) return;
-     const dataAttr = isGroup ? 'data-group-id' : 'data-user-id';
-     const itemSelector = `.chat-list-item[data-type="${isGroup ? 'group' : 'user'}"][${dataAttr}="${targetId}"]`;
-     listElement.querySelector(itemSelector)?.classList.add('active');
+    const chatItems = document.querySelectorAll('.chat-list-item');
+    
+    // Remove active class from all items
+    chatItems.forEach(item => item.classList.remove('active'));
+    
+    // Find the correct item to highlight
+    let targetItem;
+    if (isGroup) {
+        targetItem = document.querySelector(`.chat-list-item[data-group-id="${targetId}"]`);
+    } else {
+        targetItem = document.querySelector(`.chat-list-item[data-user-id="${targetId}"]`);
+    }
+    
+    if (targetItem) {
+        targetItem.classList.add('active');
+        console.log(`Highlighted chat list item for ${isGroup ? 'group' : 'user'} ${targetId}`);
+    } else {
+        console.warn(`Could not find chat list item for ${isGroup ? 'group' : 'user'} ${targetId}`);
+    }
 }
 
 export function disableChatArea(disabled) {
@@ -576,7 +589,7 @@ export function populateNewChatModalList() {
     const currentUserId = stateService.getCurrentUserId();
 
     if (contacts.length === 0) {
-        elements.newChatContactList.innerHTML = '<li>No contacts found.</li>';
+        elements.newChatContactList.innerHTML = '<li class="no-contacts-message">No contacts found.</li>';
         return;
     }
 
@@ -592,7 +605,7 @@ export function populateNewChatModalList() {
 
         listItem.innerHTML = `
             <div class="avatar-container">
-                <img src="assets/images/default-avatar.png" alt="Avatar" class="avatar">
+                <img src="assets/images/defailu-avatar.jpg" alt="Avatar" class="avatar">
                 <div class="status-indicator ${statusClass}"></div>
             </div>
             <div class="contact-info">
@@ -685,7 +698,7 @@ export function populateCreateGroupContactList(contacts) {
 
         // Create avatar
         const avatar = document.createElement('img');
-        avatar.src = contact.avatar_url || 'assets/images/default-avatar.png';
+        avatar.src = contact.avatar_url || 'assets/images/defailu-avatar.jpg';
         avatar.alt = contact.username;
         avatar.className = 'member-avatar';
 
@@ -723,10 +736,13 @@ export function populateCreateGroupContactList(contacts) {
 }
 
 export function addMemberToList(username, userId, isCurrentUser = false) {
-    if (!elements.selectedMemberList) return;
+    if (!elements.memberList) {
+        console.error("Selected member list element not found!");
+        return; 
+    }
     
     // Check if already in the list
-    const existingMember = Array.from(elements.selectedMemberList.children)
+    const existingMember = Array.from(elements.memberList.children)
         .find(item => item.dataset.userId === userId.toString());
     
     if (existingMember) return; // Already in the list
@@ -738,7 +754,7 @@ export function addMemberToList(username, userId, isCurrentUser = false) {
     
     // Avatar
     const avatar = document.createElement('img');
-    avatar.src = 'assets/images/default-avatar.png'; // Default avatar
+    avatar.src = 'assets/images/defailu-avatar.jpg'; // Default avatar
     avatar.alt = username;
     avatar.className = 'member-avatar';
     
@@ -789,13 +805,13 @@ export function addMemberToList(username, userId, isCurrentUser = false) {
     }
     
     // Add to list
-    elements.selectedMemberList.appendChild(memberItem);
+    elements.memberList.appendChild(memberItem);
 }
 
 export function getMemberIds() {
-    if (!elements.selectedMemberList) return [];
+    if (!elements.memberList) return [];
     
-    const memberItems = elements.selectedMemberList.querySelectorAll('.member-item');
+    const memberItems = elements.memberList.querySelectorAll('.member-item');
     return Array.from(memberItems).map(item => item.dataset.userId);
 }
 
@@ -862,7 +878,7 @@ export function populateManageMembersModal(groupId, members = []) {
     if (group) {
         elements.groupNameHeader.textContent = group.group_name;
         // If we have a group avatar URL in the future, set it here
-        // elements.groupAvatar.src = group.avatar_url || 'assets/images/default-avatar.png';
+        // elements.groupAvatar.src = group.avatar_url || 'assets/images/defailu-avatar.jpg';
     }
     
     // Clear existing member list
@@ -914,7 +930,7 @@ function populateMembersList(members) {
         
         // Create avatar
         const avatar = document.createElement('img');
-        avatar.src = member.avatar_url || 'assets/images/default-avatar.png';
+        avatar.src = member.avatar_url || 'assets/images/defailu-avatar.jpg';
         avatar.alt = member.username;
         avatar.classList.add('member-avatar');
         
@@ -1005,7 +1021,7 @@ export function displayMemberSearchResults(results, clickHandler) {
         item.dataset.userId = user.id;
         item.dataset.username = user.username;
         item.innerHTML = `
-            <img src="assets/images/default-avatar.png" alt="Avatar" class="avatar">
+            <img src="assets/images/defailu-avatar.jpg" alt="Avatar" class="avatar">
             <span>${user.username}</span>
         `;
         item.addEventListener('click', () => clickHandler(user.id, user.username));
@@ -1027,7 +1043,7 @@ export function clearMemberSearchResults() {
 export function populateSidebarHeader(user) {
     if (elements.sidebarProfileAvatar) {
         // TODO: Replace with actual user avatar URL when available
-        elements.sidebarProfileAvatar.src = 'assets/images/default-avatar.png'; 
+        elements.sidebarProfileAvatar.src = 'assets/images/defailu-avatar.jpg'; 
         elements.sidebarProfileAvatar.alt = `${user.username}'s Avatar`;
     }
     if (elements.sidebarProfileUsername) {
@@ -1061,7 +1077,7 @@ export function displayContactSearchResults(results, clickHandler) {
         item.dataset.userId = user.id;
         item.dataset.username = user.username;
         item.innerHTML = `
-            <img src="assets/images/default-avatar.png" alt="Avatar" class="avatar">
+            <img src="assets/images/defailu-avatar.jpg" alt="Avatar" class="avatar">
             <span>${user.username}</span>
         `;
         item.addEventListener('click', () => clickHandler(user.id, user.username));
