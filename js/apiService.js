@@ -217,3 +217,27 @@ export async function deleteUserAccount() {
     });
 }
 // --- END: User Profile Functions ---
+
+// --- NEW: Message Edit/Delete Functions ---
+export async function editMessage(messageId, newContent) {
+    return request(`/messages/${messageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content: newContent })
+    });
+}
+
+export async function deleteMessage(messageId) {
+    return request(`/messages/${messageId}`, {
+        method: 'DELETE'
+    });
+}
+// --- END: Message Edit/Delete Functions ---
+
+// --- NEW: Message Translation Function ---
+export async function translateMessage(messageId, targetLanguage) {
+    return request(`/messages/${messageId}/translate`, {
+        method: 'POST',
+        body: JSON.stringify({ target_language: targetLanguage })
+    });
+}
+// --- END: Message Translation Function ---

@@ -245,7 +245,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // If it's a message for the currently active DM chat
         if (recipientIsCurrentUser && !stateService.isGroupChat() && stateService.getCurrentChatTarget() === msg.sender_id) {
-            uiService.appendMessage(senderName, msg.content, senderIsCurrentUser, msg.timestamp, msg.read_at, msg.id, msg.recipient_id, false, null, msg.media_url, msg.media_type, msg.media_filename, msg.media_size);
+            uiService.appendMessage(senderName, msg.content, senderIsCurrentUser, msg.timestamp, msg.read_at, msg.id, msg.recipient_id, false, null, msg.media_url, msg.media_type, msg.media_filename, msg.media_size, msg.edited_at);
             // Mark as read immediately since the chat is open
             websocketService.send('mark_read', { sender_id: msg.sender_id });
             // Update item state (timestamp, preview) & re-render list
@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
         // If it's my own message echoed back for the current DM chat
         else if (senderIsCurrentUser && !stateService.isGroupChat() && stateService.getCurrentChatTarget() === msg.recipient_id) {
-            uiService.appendMessage(senderName, msg.content, true, msg.timestamp, msg.read_at, msg.id, msg.recipient_id, false, null, msg.media_url, msg.media_type, msg.media_filename, msg.media_size);
+            uiService.appendMessage(senderName, msg.content, true, msg.timestamp, msg.read_at, msg.id, msg.recipient_id, false, null, msg.media_url, msg.media_type, msg.media_filename, msg.media_size, msg.edited_at);
             // Update the read status based on the echoed message (initial state is likely unread)
              uiService.updateReadStatusIcons(msg.recipient_id); // Check if needed here
         }
@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (stateService.isGroupChat() && stateService.getCurrentChatTarget() === msg.group_id) {
             // Message for the active group chat
-             uiService.appendMessage(senderName, msg.content, senderIsCurrentUser, msg.timestamp, null, msg.id, null, true, msg.group_id, msg.media_url, msg.media_type, msg.media_filename, msg.media_size);
+             uiService.appendMessage(senderName, msg.content, senderIsCurrentUser, msg.timestamp, null, msg.id, null, true, msg.group_id, msg.media_url, msg.media_type, msg.media_filename, msg.media_size, msg.edited_at);
              // TODO: Implement group read receipts?
              // Update item state (timestamp, preview) & re-render list
              stateService.updateChatItemOnMessage(msg.group_id, true, msg);
@@ -342,9 +342,150 @@ document.addEventListener('DOMContentLoaded', async () => {
     websocketService.registerActionHandler('messages_read', (payload) => {
         console.log('Handler: Received messages_read for reader:', payload.reader_id);
         // Update icons for messages sent *by me* to the reader
-         if (stateService.getCurrentUserId() === payload.sender_id) { // Check if I sent the original messages
+        if (stateService.getCurrentUserId() === payload.sender_id) { // Check if I sent the original messages
             uiService.updateReadStatusIcons(payload.reader_id);
-         }
+        }
+    });
+
+    // NEW: Handle edited messages
+    websocketService.registerActionHandler('message_edited', (payload) => {
+        console.log("WebSocket: Message edited notification", payload);
+        // Find the message element to update
+        const messageElement = document.querySelector(`.message-group[data-message-id="${payload.message_id}"] .message-bubble`);
+        if (messageElement) {
+            // Update the content
+            if (messageElement.querySelector('.message-edit-form')) {
+                // If the user is currently editing this message, don't update
+                console.log("User is currently editing this message, not updating UI");
+                return;
+            }
+            
+            // Update message content
+            const spanElements = messageElement.querySelectorAll('span');
+            let textSpan;
+            for (const span of spanElements) {
+                if (!span.classList.contains('timestamp') && 
+                    !span.classList.contains('read-status-icon') &&
+                    !span.classList.contains('edited-indicator')) {
+                    // This is likely the text content span
+                    textSpan = span;
+                    break;
+                }
+            }
+            
+            if (textSpan) {
+                textSpan.textContent = payload.new_content;
+            } else {
+                // Create a new text span if none exists
+                textSpan = document.createElement('span');
+                textSpan.textContent = payload.new_content;
+                
+                // Clear the message bubble and add the new text
+                messageElement.innerHTML = '';
+                messageElement.appendChild(textSpan);
+            }
+            
+            // Add edited indicator to message meta
+            const messageGroupElement = messageElement.closest('.message-group');
+            const msgMetaElement = messageGroupElement.querySelector('.message-meta');
+            if (msgMetaElement) {
+                // Check if edited indicator already exists
+                let editedSpan = msgMetaElement.querySelector('.edited-indicator');
+                if (!editedSpan) {
+                    editedSpan = document.createElement('span');
+                    editedSpan.classList.add('edited-indicator');
+                    editedSpan.textContent = '(edited)';
+                    msgMetaElement.appendChild(editedSpan);
+                }
+            }
+        }
+    });
+    
+    // NEW: Handle deleted messages
+    websocketService.registerActionHandler('message_deleted', (payload) => {
+        console.log("WebSocket: Message deleted notification", payload);
+        // Find and remove the message element
+        const messageElement = document.querySelector(`.message-group[data-message-id="${payload.message_id}"]`);
+        if (messageElement) {
+            // Fade out and remove
+            messageElement.style.transition = 'opacity 0.5s, transform 0.5s';
+            messageElement.style.opacity = '0';
+            messageElement.style.transform = 'scale(0.8)';
+            
+            // Remove after animation
+            setTimeout(() => {
+                messageElement.remove();
+            }, 500);
+        }
+    });
+    
+    // NEW: Handle group message edited events
+    websocketService.registerActionHandler('group_message_edited', (payload) => {
+        console.log("WebSocket: Group message edited notification", payload);
+        // Similar to message_edited but for group messages
+        const messageElement = document.querySelector(`.message-group[data-message-id="${payload.message_id}"] .message-bubble`);
+        if (messageElement) {
+            if (messageElement.querySelector('.message-edit-form')) {
+                console.log("User is currently editing this message, not updating UI");
+                return;
+            }
+            
+            // Update message content (same as for direct messages)
+            const spanElements = messageElement.querySelectorAll('span');
+            let textSpan;
+            for (const span of spanElements) {
+                if (!span.classList.contains('timestamp') && 
+                    !span.classList.contains('read-status-icon') &&
+                    !span.classList.contains('edited-indicator')) {
+                    textSpan = span;
+                    break;
+                }
+            }
+            
+            if (textSpan) {
+                textSpan.textContent = payload.new_content;
+            } else {
+                textSpan = document.createElement('span');
+                textSpan.textContent = payload.new_content;
+                messageElement.innerHTML = '';
+                messageElement.appendChild(textSpan);
+            }
+            
+            // Add edited indicator
+            const messageGroupElement = messageElement.closest('.message-group');
+            const msgMetaElement = messageGroupElement.querySelector('.message-meta');
+            if (msgMetaElement) {
+                let editedSpan = msgMetaElement.querySelector('.edited-indicator');
+                if (!editedSpan) {
+                    editedSpan = document.createElement('span');
+                    editedSpan.classList.add('edited-indicator');
+                    editedSpan.textContent = '(edited)';
+                    msgMetaElement.appendChild(editedSpan);
+                }
+            }
+        }
+    });
+    
+    // NEW: Handle group message deleted events
+    websocketService.registerActionHandler('group_message_deleted', (payload) => {
+        console.log("WebSocket: Group message deleted notification", payload);
+        // Same as message_deleted
+        const messageElement = document.querySelector(`.message-group[data-message-id="${payload.message_id}"]`);
+        if (messageElement) {
+            messageElement.style.transition = 'opacity 0.5s, transform 0.5s';
+            messageElement.style.opacity = '0';
+            messageElement.style.transform = 'scale(0.8)';
+            
+            setTimeout(() => {
+                messageElement.remove();
+            }, 500);
+        }
+    });
+
+    // Handler for real-time message translation notifications
+    websocketService.registerActionHandler('message_translated', (payload) => {
+        console.log('Translation received via WebSocket:', payload);
+        uiService.handleMessageTranslation(payload);
     });
 
     // --- Connect WebSocket ---
@@ -437,7 +578,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         msg.media_url, 
                         msg.media_type, 
                         msg.media_filename, 
-                        msg.media_size
+                        msg.media_size,
+                        msg.edited_at
                     );
                 });
             }
