@@ -96,6 +96,13 @@ export function connect() {
             } else if (action === 'ping') {
                  // Auto-respond to pings if backend expects it
                  // send('pong', { timestamp: payload.timestamp });
+            } else if (action === 'message_translated') {
+                // Handle incoming translation result
+                console.log('Message translation received:', payload);
+                // Will use registered handler for proper implementation
+                if (actionHandlers['message_translated']) {
+                    actionHandlers['message_translated'](payload);
+                }
             } else {
                 console.warn('Unknown WebSocket action received:', action);
             }

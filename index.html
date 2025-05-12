@@ -6,6 +6,28 @@
   <title>AIT Chat - Login</title>
   <link rel="stylesheet" href="css/login.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kufam:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    .admin-access-button {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background-color: #00A3FF;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 15px;
+      font-size: 14px;
+      font-weight: 500;
+      z-index: 1000;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      font-family: 'Inter', sans-serif;
+    }
+    
+    .admin-access-button:hover {
+      background-color: #008bdb;
+    }
+  </style>
 </head>
 <body>
   <div class="login-container">
@@ -50,6 +72,27 @@
   <div class="login-footer">
     <p>Year 2025 AITC Daniyal & Alaman</p>
   </div>
+  
+  <!-- Admin Access Button (Temporary) -->
+  <button class="admin-access-button" onclick="window.location.href='admin.html'">Admin Panel</button>
+  
   <script src="js/login.js"></script>
+  <script>
+    // Add a simple admin access via localStorage for testing
+    document.addEventListener('DOMContentLoaded', function() {
+      const loginButton = document.getElementById('login-button');
+      const usernameInput = document.getElementById('username');
+      
+      if (loginButton) {
+        loginButton.addEventListener('click', function() {
+          // Check if username is "admin" for quick admin access
+          if (usernameInput.value.toLowerCase() === 'admin') {
+            localStorage.setItem('userRole', 'admin');
+            window.location.href = 'admin.html';
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>

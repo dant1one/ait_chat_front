@@ -166,7 +166,7 @@ function formatTimestampForList(isoTimestamp) {
 
 // --- End Unified Chat List Rendering ---
 
-export function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = null, messageId = null, recipientId = null, isGroup = false, groupId = null, mediaUrl = null, mediaType = null, mediaFilename = null, mediaSize = null) {
+export function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = null, messageId = null, recipientId = null, isGroup = false, groupId = null, mediaUrl = null, mediaType = null, mediaFilename = null, mediaSize = null, editedAt = null) {
      if (!elements.chatMessages) return;
     // Add log to check the isMe value being passed
     console.log(`[appendMessage] Rendering msgId=${messageId}, isMe=${isMe}, sender=${sender}, isGroup=${isGroup}, groupId=${groupId}`);
@@ -207,6 +207,18 @@ export function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = 
     console.log(`APPEND_MSG (isMe=${isMe}, isGroup=${isGroup}, messageId=${messageId}): mediaUrl=${mediaUrl}, mediaType=${mediaType}, mediaFilename=${mediaFilename}, mediaSize=${mediaSize}`);
     // --- NEW: Media Rendering --- 
 
+    // --- Add right-click context menu for user messages ---
+    if (isMe) {
+        // Make message interactive for user's own messages
+        messageBubbleDiv.classList.add('user-message');
+        
+        // Add context menu event listener for user's own messages
+        messageBubbleDiv.addEventListener('contextmenu', function(e) {
+            e.preventDefault(); // Prevent default context menu
+            showMessageContextMenu(e, messageId, messageBubbleDiv, text);
+        });
+    }
+    // --- End right-click context menu ---
 
     if (mediaUrl) {
         if (mediaType && mediaType.startsWith('image')) {
@@ -294,6 +306,14 @@ export function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = 
         readStatusContainer.appendChild(readStatusIcon);
     }
 
+    // Add edited indicator if message has been edited
+    if (editedAt) {
+        const editedSpan = document.createElement('span');
+        editedSpan.classList.add('edited-indicator');
+        editedSpan.textContent = '(edited)';
+        messageMetaDiv.appendChild(editedSpan);
+    }
+
     messageMetaDiv.appendChild(timestampSpan);
     messageMetaDiv.appendChild(readStatusContainer);
 
@@ -307,6 +327,248 @@ export function appendMessage(sender, text, isMe, isoTimestamp = null, readAt = 
 
     // Scroll to bottom (might need slight delay sometimes)
     scrollToBottom();
+}
+
+// Function to show message context menu
+function showMessageContextMenu(event, messageId, messageBubbleDiv, messageText) {
+    // Remove any existing context menus
+    removeMessageContextMenu();
+    
+    // Create context menu element
+    const contextMenu = document.createElement('div');
+    contextMenu.classList.add('message-context-menu');
+    contextMenu.id = 'message-context-menu';
+    
+    // Create menu items
+    const editOption = document.createElement('div');
+    editOption.classList.add('context-menu-option');
+    editOption.innerHTML = '<img src="assets/svg/edit-3.svg" alt="Edit" class="context-menu-icon"> Edit';
+    editOption.addEventListener('click', () => {
+        // Now using real edit functionality
+        console.log('Edit message:', messageId);
+        removeMessageContextMenu();
+        
+        // Show edit input for this message
+        showMessageEditInput(messageId, messageBubbleDiv, messageText);
+    });
+    
+    // Add translate option
+    const translateOption = document.createElement('div');
+    translateOption.classList.add('context-menu-option');
+    translateOption.innerHTML = '<img src="assets/svg/globe.svg" alt="Translate" class="context-menu-icon"> Translate';
+    translateOption.addEventListener('click', () => {
+        console.log('Translate message:', messageId);
+        removeMessageContextMenu();
+        
+        // Show language selection dropdown
+        showTranslateLanguageSelector(messageId, messageBubbleDiv, messageText);
+    });
+    
+    const deleteOption = document.createElement('div');
+    deleteOption.classList.add('context-menu-option');
+    deleteOption.innerHTML = '<img src="assets/svg/trash-2.svg" alt="Delete" class="context-menu-icon"> Delete';
+    deleteOption.addEventListener('click', () => {
+        // Confirm before deleting
+        if (confirm('Are you sure you want to delete this message?')) {
+            removeMessageContextMenu();
+            
+            // Show deleting effect
+            const messageGroupElement = document.querySelector(`.message-group[data-message-id="${messageId}"]`);
+            if (messageGroupElement) {
+                // Add delete animation
+                messageGroupElement.style.transition = 'opacity 0.5s, transform 0.5s';
+                messageGroupElement.style.opacity = '0';
+                messageGroupElement.style.transform = 'scale(0.8)';
+                
+                // Delete through API
+                import('./apiService.js').then(apiService => {
+                    apiService.deleteMessage(messageId)
+                        .then(() => {
+                            // Remove the element after successful deletion
+                            messageGroupElement.remove();
+                            console.log('Message deleted:', messageId);
+                        })
+                        .catch(error => {
+                            // Restore the element if deletion fails
+                            messageGroupElement.style.opacity = '1';
+                            messageGroupElement.style.transform = 'scale(1)';
+                            console.error('Failed to delete message:', error);
+                            alert('Failed to delete message: ' + (error.detail || 'Unknown error'));
+                        });
+                });
+            }
+        } else {
+            removeMessageContextMenu();
+        }
+    });
+    
+    // Add options to menu
+    contextMenu.appendChild(editOption);
+    contextMenu.appendChild(translateOption);
+    contextMenu.appendChild(deleteOption);
+    
+    // Position menu to the left of the message
+    const messageRect = messageBubbleDiv.getBoundingClientRect();
+    
+    // Set vertical position (align with cursor Y position)
+    contextMenu.style.top = `${event.clientY}px`;
+    
+    // Position to the left of sender's messages
+    // First add the menu to the DOM with visibility hidden so we can get its width
+    contextMenu.style.visibility = 'hidden';
+    document.body.appendChild(contextMenu);
+    
+    const menuWidth = contextMenu.offsetWidth;
+    const leftPosition = messageRect.left - menuWidth - 10;
+    
+    // Check if the menu would go off-screen to the left
+    if (leftPosition < 10) {
+        // If it would go off-screen, position it to the right of the message instead
+        contextMenu.style.left = `${messageRect.right + 10}px`;
+    } else {
+        // Otherwise position to the left as planned
+        contextMenu.style.left = `${leftPosition}px`;
+    }
+    
+    // Make the menu visible again
+    contextMenu.style.visibility = 'visible';
+    
+    // Handle clicking outside the menu to close it
+    document.addEventListener('click', function closeMenu(e) {
+        if (!contextMenu.contains(e.target) && e.target !== messageBubbleDiv) {
+            removeMessageContextMenu();
+            document.removeEventListener('click', closeMenu);
+        }
+    });
+    
+    // Also close on escape key
+    document.addEventListener('keydown', function escapeClose(e) {
+        if (e.key === 'Escape') {
+            removeMessageContextMenu();
+            document.removeEventListener('keydown', escapeClose);
+        }
+    });
+}
+
+// Add function to show message edit input
+function showMessageEditInput(messageId, messageBubble, originalText) {
+    // Add editing class to message
+    messageBubble.classList.add('being-edited');
+    
+    // Save original content
+    const originalContent = messageBubble.innerHTML;
+    
+    // Create edit form
+    const editForm = document.createElement('div');
+    editForm.classList.add('message-edit-form');
+    
+    // Create edit input
+    const editInput = document.createElement('input');
+    editInput.type = 'text';
+    editInput.value = originalText;
+    editInput.classList.add('message-edit-input');
+    
+    // Create button container
+    const buttonContainer = document.createElement('div');
+    buttonContainer.classList.add('message-edit-buttons');
+    
+    // Create save button
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Save';
+    saveButton.classList.add('message-edit-save');
+    
+    // Create cancel button
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Cancel';
+    cancelButton.classList.add('message-edit-cancel');
+    
+    // Add buttons to container
+    buttonContainer.appendChild(saveButton);
+    buttonContainer.appendChild(cancelButton);
+    
+    // Add input and buttons to form
+    editForm.appendChild(editInput);
+    editForm.appendChild(buttonContainer);
+    
+    // Replace message content with edit form
+    messageBubble.innerHTML = '';
+    messageBubble.appendChild(editForm);
+    
+    // Focus the input
+    editInput.focus();
+    editInput.select();
+    
+    // Handle save button click
+    saveButton.addEventListener('click', () => {
+        const newText = editInput.value.trim();
+        if (newText && newText !== originalText) {
+            // Show loading state
+            saveButton.textContent = 'Saving...';
+            saveButton.disabled = true;
+            
+            // Call API to update message
+            import('./apiService.js').then(apiService => {
+                apiService.editMessage(messageId, newText)
+                    .then(() => {
+                        // Update message with new content
+                        const textNode = document.createElement('span');
+                        textNode.textContent = newText;
+                        messageBubble.innerHTML = '';
+                        messageBubble.appendChild(textNode);
+                        messageBubble.classList.remove('being-edited');
+                        
+                        // Show edited indicator if needed
+                        const messageGroupElement = messageBubble.closest('.message-group');
+                        const msgMetaElement = messageGroupElement.querySelector('.message-meta');
+                        if (msgMetaElement) {
+                            const editedSpan = document.createElement('span');
+                            editedSpan.classList.add('edited-indicator');
+                            editedSpan.textContent = '(edited)';
+                            msgMetaElement.appendChild(editedSpan);
+                        }
+                        
+                        console.log('Message edited successfully:', messageId);
+                    })
+                    .catch(error => {
+                        console.error('Failed to edit message:', error);
+                        alert('Failed to edit message: ' + (error.detail || 'Unknown error'));
+                        // Restore original content on error
+                        messageBubble.innerHTML = originalContent;
+                        messageBubble.classList.remove('being-edited');
+                    });
+            });
+        } else {
+            // If no changes or empty, just restore original
+            messageBubble.innerHTML = originalContent;
+            messageBubble.classList.remove('being-edited');
+        }
+    });
+    
+    // Handle cancel button click
+    cancelButton.addEventListener('click', () => {
+        // Restore original content
+        messageBubble.innerHTML = originalContent;
+        messageBubble.classList.remove('being-edited');
+    });
+    
+    // Handle Enter key to save
+    editInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveButton.click();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelButton.click();
+        }
+    });
+}
+
+// Function to remove message context menu
+function removeMessageContextMenu() {
+    const existingMenu = document.getElementById('message-context-menu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
 }
 
 export function appendSystemMessage(text) {
@@ -1296,3 +1558,170 @@ export function setEditGroupLoading(loading) {
 }
 
 // --- End Edit Group Modal Functions ---
+
+// New function to show language selection dropdown for translation
+function showTranslateLanguageSelector(messageId, messageBubble, originalText) {
+    // Create language selector dropdown
+    const languageSelector = document.createElement('div');
+    languageSelector.classList.add('translate-language-selector');
+    
+    // Common languages to choose from
+    const languages = [
+        { code: 'en', name: 'English' },
+        { code: 'ru', name: 'Russian' },
+        { code: 'es', name: 'Spanish' },
+        { code: 'fr', name: 'French' },
+        { code: 'de', name: 'German' },
+        { code: 'it', name: 'Italian' },
+        { code: 'zh', name: 'Chinese' },
+        { code: 'ja', name: 'Japanese' },
+    ];
+    
+    const selectorTitle = document.createElement('div');
+    selectorTitle.classList.add('selector-title');
+    selectorTitle.textContent = 'Translate to:';
+    languageSelector.appendChild(selectorTitle);
+    
+    // Create option for each language
+    languages.forEach(lang => {
+        const langOption = document.createElement('div');
+        langOption.classList.add('language-option');
+        langOption.textContent = lang.name;
+        langOption.dataset.langCode = lang.code;
+        
+        langOption.addEventListener('click', () => {
+            // Remove language selector
+            if (languageSelector.parentNode) {
+                languageSelector.parentNode.removeChild(languageSelector);
+            }
+            
+            // Show loading state
+            const originalContent = messageBubble.innerHTML;
+            messageBubble.innerHTML = '<div class="translation-loading">Translating...</div>';
+            
+            // Call translation API
+            import('./apiService.js').then(apiService => {
+                apiService.translateMessage(messageId, lang.code)
+                    .then(result => {
+                        // Update message bubble with translated text
+                        updateMessageWithTranslation(
+                            messageBubble, 
+                            result.translated_text, 
+                            originalText,
+                            result.source_language,
+                            result.target_language
+                        );
+                    })
+                    .catch(error => {
+                        // Restore original content on error
+                        messageBubble.innerHTML = originalContent;
+                        console.error('Translation failed:', error);
+                        alert('Failed to translate message: ' + (error.detail || 'Unknown error'));
+                    });
+            });
+        });
+        
+        languageSelector.appendChild(langOption);
+    });
+    
+    // Add close button
+    const closeButton = document.createElement('div');
+    closeButton.classList.add('language-selector-close');
+    closeButton.textContent = 'Cancel';
+    closeButton.addEventListener('click', () => {
+        if (languageSelector.parentNode) {
+            languageSelector.parentNode.removeChild(languageSelector);
+        }
+    });
+    languageSelector.appendChild(closeButton);
+    
+    // Position the selector near the message bubble
+    document.body.appendChild(languageSelector);
+    const bubbleRect = messageBubble.getBoundingClientRect();
+    
+    // Position above the message if there's room, otherwise below
+    const selectorHeight = languageSelector.offsetHeight;
+    if (bubbleRect.top > selectorHeight + 20) {
+        languageSelector.style.top = `${bubbleRect.top - selectorHeight - 10}px`;
+    } else {
+        languageSelector.style.top = `${bubbleRect.bottom + 10}px`;
+    }
+    
+    // Center horizontally on the message
+    languageSelector.style.left = `${bubbleRect.left + (bubbleRect.width / 2) - (languageSelector.offsetWidth / 2)}px`;
+    
+    // Handle clicking outside to close
+    document.addEventListener('click', function closeSelector(e) {
+        if (!languageSelector.contains(e.target) && e.target !== messageBubble) {
+            if (languageSelector.parentNode) {
+                languageSelector.parentNode.removeChild(languageSelector);
+            }
+            document.removeEventListener('click', closeSelector);
+        }
+    });
+}
+
+// Function to update message with translation
+function updateMessageWithTranslation(messageBubble, translatedText, originalText, sourceLanguage, targetLanguage) {
+    // Clear existing content
+    messageBubble.innerHTML = '';
+    
+    // Create translated content container
+    const translatedContent = document.createElement('div');
+    translatedContent.classList.add('translated-content');
+    translatedContent.textContent = translatedText;
+    
+    // Create show original button
+    const showOriginalButton = document.createElement('button');
+    showOriginalButton.classList.add('show-original-button');
+    showOriginalButton.textContent = 'Show Original';
+    showOriginalButton.setAttribute('title', `Translated from ${sourceLanguage} to ${targetLanguage}`);
+    
+    // Flag to track state
+    let showingTranslation = true;
+    
+    // Toggle between original and translated text
+    showOriginalButton.addEventListener('click', () => {
+        if (showingTranslation) {
+            // Switch to original
+            translatedContent.textContent = originalText;
+            showOriginalButton.textContent = 'Show Translation';
+        } else {
+            // Switch to translation
+            translatedContent.textContent = translatedText;
+            showOriginalButton.textContent = 'Show Original';
+        }
+        showingTranslation = !showingTranslation;
+    });
+    
+    // Add elements to message bubble
+    messageBubble.appendChild(translatedContent);
+    messageBubble.appendChild(showOriginalButton);
+    
+    // Add translation indicator
+    messageBubble.classList.add('translated');
+}
+
+// Export function to handle message translation received from WebSocket
+export function handleMessageTranslation(translationData) {
+    const { message_id, translated_text, source_language, target_language } = translationData;
+    
+    // Find the message bubble
+    const messageGroup = document.querySelector(`.message-group[data-message-id="${message_id}"]`);
+    if (!messageGroup) return;
+    
+    const messageBubble = messageGroup.querySelector('.message-bubble');
+    if (!messageBubble) return;
+    
+    // Get the original text
+    const originalText = messageBubble.textContent || '';
+    
+    // Update the message with translation
+    updateMessageWithTranslation(
+        messageBubble,
+        translated_text,
+        originalText,
+        source_language,
+        target_language
+    );
+}

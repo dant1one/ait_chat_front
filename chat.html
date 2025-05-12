@@ -8,6 +8,47 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Kufam:wght@400;600;700&display=swap" rel="stylesheet">
   <!-- Add Emoji Picker Library -->
   <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+  <!-- Add styling for the button at end of <head> section -->
+  <style>
+    .admin-button {
+      background-color: #00A3FF;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      margin-left: 15px;
+      transition: background-color 0.2s ease;
+      display: none; /* Hidden by default, shown for admin users */
+    }
+    
+    .admin-button:hover {
+      background-color: #008bdb;
+    }
+    
+    /* Admin sidebar button styles */
+    .admin-sidebar-button {
+      position: relative;
+    }
+    
+    .admin-sidebar-button::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 8px;
+      height: 8px;
+      background-color: #00A3FF;
+      border-radius: 50%;
+      border: 1px solid white;
+    }
+    
+    .admin-sidebar-button:hover {
+      background-color: rgba(0, 163, 255, 0.1);
+    }
+  </style>
 </head>
 <body>
   <div class="app-container">
@@ -26,6 +67,10 @@
             </button>
              <button class="icon-button" aria-label="Settings">
                  <img src="assets/svg/settings.svg" alt="Settings" class="icon-svg">
+            </button>
+            <!-- Add Admin Button (hidden by default) -->
+            <button class="icon-button" id="admin-button" aria-label="Admin Panel" style="display: none;">
+                <img src="assets/svg/shield.svg" alt="Admin" class="icon-svg">
             </button>
         </div>
       </div>
@@ -223,8 +268,8 @@
             <button class="icon-button" aria-label="Phone Call"></button>
             <button class="icon-button" id="chat-header-more-options" aria-label="More Options">⋮</button>
             <button class="logout-button">Logout</button>
-
-            <!-- NEW: Chat Actions Dropdown (hidden by default) -->
+            
+            <!-- Chat Actions Dropdown (hidden by default) -->
             <div id="chat-actions-dropdown" class="chat-actions-dropdown">
                 <ul>
                     <!-- Items will be populated by JS -->
@@ -234,8 +279,8 @@
                     <li><button data-action="delete-chat" class="danger">Delete Chat</button></li>
                 </ul>
             </div>
-        </div>
-      </header>
+          </div>
+        </header>
 
       <div id="chat-messages" class="chat-messages">
       </div>
@@ -345,6 +390,24 @@
 
     </main>
   </div>
-  <script type="module" src="js/main.js"></script> 
+  <script type="module" src="js/main.js"></script>
+  <!-- Add script to check for admin role and show the admin button if needed -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Check if user is admin
+      const adminButton = document.getElementById('admin-button');
+      const isAdmin = localStorage.getItem('userRole') === 'admin' || localStorage.getItem('is_admin') === 'true';
+      
+      if (adminButton && isAdmin) {
+        // Show admin button
+        adminButton.style.display = 'inline-flex';
+        
+        // Add click handler to navigate to admin panel
+        adminButton.addEventListener('click', function() {
+          window.location.href = 'admin.html';
+        });
+      }
+    });
+  </script>
 </body>
 </html> 
